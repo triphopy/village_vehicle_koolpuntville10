@@ -38,17 +38,15 @@ function doPost(e) {
     }
 
     // Admin Commands
-    if (query.startsWith('/') && staff.role === 'admin') {
-      var result = handleAdminCommand(query, userId);
-      replyToLine(replyToken, result);
-      return;
-    }
-
-    // ถ้าพิมพ์ / แต่ไม่ใช่ admin
-    if (query.startsWith('/add') || query.startsWith('/remove') || query.startsWith('/list')) {
-      replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');
-      return;
-    }
+  if (query.startsWith('/')) {
+  if (staff.role === 'admin') {
+    var result = handleAdminCommand(query, userId);
+    replyToLine(replyToken, result);
+  } else {
+    replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');
+  }
+  return;
+}
 
     // ค้นหาปกติ
     var result = '';
@@ -326,4 +324,19 @@ function getVehicleData() {
 // ============================
 function keepAlive() {
   Logger.log('keep alive: ' + new Date());
+}
+
+function clearAllCache() {
+  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+  var values = sheet.getDataRange().getValues();
+  var keys   = [];
+
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][1]) {
+      keys.push('staff_' + values[i][1].toString().trim());
+    }
+  }
+
+  CacheService.getScriptCache().removeAll(keys);
+  Logger.log('Cleared ' + keys.length + ' cache keys');
 }
