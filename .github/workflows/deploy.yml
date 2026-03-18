@@ -35,4 +35,4 @@ jobs:
         run: clasp push --force
 
       - name: Deploy new version
-        run: clasp deploy --description "Auto deploy from GitHub Actions"
+        run: clasp deploy --description "${{ github.event.head_commit.message }}"
