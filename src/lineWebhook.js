@@ -59,20 +59,29 @@ function doPost(e) {
 // ค้นหาจากทะเบียนรถ
 // ============================
 function searchByPlate(query) {
-  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
-  var values = getVehicleData();
-  var q      = query.replace(/\s/g, '').toLowerCase();
+  var sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
+  var values  = sheet.getDataRange().getValues();
+  var q       = query.replace(/\s/g, '').toLowerCase();
+  var results = [];
 
   for (var i = 1; i < values.length; i++) {
     var plate = values[i][0].toString().replace(/\s/g, '').toLowerCase();
     if (plate.includes(q)) {
-      var msg = '✅ พบข้อมูลในระบบ\n\n' +
-                '🚗 ' + values[i][0] + '\n' +
-                '    ' + values[i][1] + ' ' + values[i][2] + ' | สี' + values[i][3] + '\n' +
-                '🏠 บ้านเลขที่: ' + values[i][4];
-      return { found: true, message: msg };
+      results.push(
+        '🚗 ' + values[i][0] + '\n' +
+        '    ' + values[i][1] + ' ' + values[i][2] + ' | สี' + values[i][3] + '\n' +
+        '🏠 บ้านเลขที่: ' + values[i][4]
+      );
     }
   }
+
+  if (results.length > 0) {
+    var header = results.length > 1
+      ? '✅ พบข้อมูล ' + results.length + ' รายการ\n\n'
+      : '✅ พบข้อมูลในระบบ\n\n';
+    return { found: true, message: header + results.join('\n\n') };
+  }
+
   return { found: false, message: '❌ ไม่พบทะเบียนนี้ในระบบ\nกรุณาแลกบัตรตามขั้นตอนปกติ' };
 }
 
