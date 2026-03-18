@@ -154,14 +154,24 @@ function isAuthorized(userId) {
 // ดึงชื่อ LINE Profile
 // ============================
 function getLineDisplayName(userId) {
+  // เช็ค Cache ก่อน
+  var cache  = CacheService.getScriptCache();
+  var cached = cache.get('line_name_' + userId);
+  if (cached) return cached;
+
   try {
     var response = UrlFetchApp.fetch(
       'https://api.line.me/v2/bot/profile/' + userId, {
       method: 'get',
       headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN }
     });
-    var profile = JSON.parse(response.getContentText());
-    return profile.displayName || userId;
+    var profile     = JSON.parse(response.getContentText());
+    var displayName = profile.displayName || userId;
+
+    // Cache ชื่อไว้ 1 ชั่วโมง
+    cache.put('line_name_' + userId, displayName, 3600);
+    return displayName;
+
   } catch(err) {
     return userId;
   }
