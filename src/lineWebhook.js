@@ -89,21 +89,31 @@ function searchByPlate(query) {
 // ค้นหาจากบ้านเลขที่
 // ============================
 function searchByHouse(query) {
-  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
-  var values = getVehicleData();
+  var sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
+  var values  = sheet.getDataRange().getValues();
+  var q       = query.trim();
   var results = [];
 
   for (var i = 1; i < values.length; i++) {
     var house = values[i][4].toString().trim();
-    if (house === query.trim()) {
-      results.push('🚗 ' + values[i][0] + ' | ' + values[i][1] + ' ' + values[i][2] + ' | สี' + values[i][3]);
+    
+    // ✅ เช็คทั้ง 2 แบบ
+    // แบบที่ 1: ตรงกันเป๊ะ เช่น 171/1 = 171/1
+    // แบบที่ 2: อยู่ในช่วง เช่น 171/160 อยู่ใน 171/160-164
+    if (house === q || house.includes(q)) {
+      results.push(
+        '🚗 ' + values[i][0] + '\n' +
+        '    ' + values[i][1] + ' ' + values[i][2] + ' | สี' + values[i][3]
+      );
     }
   }
 
   if (results.length > 0) {
-    var msg = '🏠 บ้านเลขที่ ' + query + ' พบรถ ' + results.length + ' คัน\n\n' + results.join('\n');
+    var msg = '🏠 บ้านเลขที่ ' + query + ' พบรถ ' + results.length + ' คัน\n\n' +
+              results.join('\n\n');
     return { found: true, message: msg };
   }
+
   return { found: false, message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ' };
 }
 
