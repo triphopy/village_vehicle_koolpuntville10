@@ -2,7 +2,7 @@
 // ตั้งค่าตรงนี้ก่อนใช้งาน
 // ============================
 var props = PropertiesService.getScriptProperties();
-var LINE_ACCESS_TOKEN  = props.getProperty('LINE_ACCESS_TOKEN');
+var LINE_ACCESS_TOKEN   = props.getProperty('LINE_ACCESS_TOKEN');
 var LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
 
 // ============================
@@ -10,7 +10,7 @@ var LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
 // ============================
 function doPost(e) {
   try {
-    var data = JSON.parse(e.postData.contents);
+    var data  = JSON.parse(e.postData.contents);
     var event = data.events[0];
 
     // ตอนแอด Bot → ส่ง User ID กลับอัตโนมัติ
@@ -31,28 +31,153 @@ function doPost(e) {
     var query      = event.message.text.trim();
 
     // ตรวจสอบสิทธิ์
-    if (!isAuthorized(userId)) {
+    var staff = getStaff(userId);
+    if (!staff) {
       replyToLine(replyToken, '🚫 ไม่มีสิทธิ์เข้าถึงระบบ\nกรุณาติดต่อนิติบุคคล');
       return;
     }
 
-    var result = '';
+    // Admin Commands
+    if (query.startsWith('/') && staff.role === 'admin') {
+      var result = handleAdminCommand(query, userId);
+      replyToLine(replyToken, result);
+      return;
+    }
 
-    // แยกประเภทการค้นหา: มี "/" = บ้านเลขที่, อื่นๆ = ทะเบียน
+    // ถ้าพิมพ์ / แต่ไม่ใช่ admin
+    if (query.startsWith('/add') || query.startsWith('/remove') || query.startsWith('/list')) {
+      replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');
+      return;
+    }
+
+    // ค้นหาปกติ
+    var result = '';
     if (query.indexOf('/') !== -1) {
       result = searchByHouse(query);
     } else {
       result = searchByPlate(query);
     }
 
-    // บันทึก Log
     writeLog(userId, query, result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
-
     replyToLine(replyToken, result.message);
 
   } catch(err) {
     Logger.log(err);
   }
+}
+
+// ============================
+// Admin Commands
+// ============================
+function handleAdminCommand(query, adminId) {
+  var parts = query.split(' ');
+  var cmd   = parts[0].toLowerCase();
+
+  // /add <userId> <ชื่อ> <role>
+  // เช่น /add U578c3f... สมชาย staff
+  if (cmd === '/add') {
+    if (parts.length < 4) return '❌ รูปแบบไม่ถูกต้อง\nใช้: /add <userId> <ชื่อ> <role>\nเช่น: /add U578c3f... สมชาย staff';
+    var newId   = parts[1].trim();
+    var newName = parts[2].trim();
+    var newRole = parts[3].trim().toLowerCase();
+
+    if (newRole !== 'admin' && newRole !== 'staff') {
+      return '❌ role ต้องเป็น admin หรือ staff เท่านั้น';
+    }
+
+    var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+    var values = sheet.getDataRange().getValues();
+    for (var i = 1; i < values.length; i++) {
+      if (values[i][1].toString().trim() === newId) {
+        return '⚠️ User ID นี้มีในระบบแล้ว';
+      }
+    }
+    sheet.appendRow([newName, newId, 'active', newRole]);
+    clearStaffCache(newId);
+    return '✅ เพิ่ม ' + newName + ' (' + newRole + ') สำเร็จ';
+  }
+
+  // /remove <userId>
+  if (cmd === '/remove') {
+    if (parts.length < 2) return '❌ รูปแบบไม่ถูกต้อง\nใช้: /remove <userId>';
+    var removeId = parts[1].trim();
+    var sheet    = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+    var values   = sheet.getDataRange().getValues();
+    for (var i = 1; i < values.length; i++) {
+      if (values[i][1].toString().trim() === removeId) {
+        sheet.deleteRow(i + 1);
+        clearStaffCache(removeId);
+        return '✅ ลบ ' + values[i][0] + ' ออกจากระบบแล้ว';
+      }
+    }
+    return '❌ ไม่พบ User ID นี้ในระบบ';
+  }
+
+  // /list
+  if (cmd === '/list') {
+    var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+    var values = sheet.getDataRange().getValues();
+    var list   = ['👥 รายชื่อผู้ใช้งานทั้งหมด\n'];
+    for (var i = 1; i < values.length; i++) {
+      if (values[i][0]) {
+        var icon = values[i][3] === 'admin' ? '👑' : '👤';
+        list.push(icon + ' ' + values[i][0] + ' (' + values[i][3] + ') - ' + values[i][2]);
+      }
+    }
+    return list.join('\n');
+  }
+
+  // /status <userId>
+  if (cmd === '/status') {
+    if (parts.length < 2) return '❌ รูปแบบไม่ถูกต้อง\nใช้: /status <userId>';
+    var checkId = parts[1].trim();
+    var staff   = getStaff(checkId);
+    if (!staff) return '❌ ไม่พบ User ID นี้ในระบบ';
+    return '📋 ' + staff.name + '\nRole: ' + staff.role + '\nStatus: ' + staff.status;
+  }
+
+  return '❌ ไม่รู้จักคำสั่งนี้\nคำสั่งที่ใช้ได้: /add /remove /list /status';
+}
+
+// ============================
+// ดึงข้อมูล Staff (พร้อม Cache)
+// ============================
+function getStaff(userId) {
+  var cache  = CacheService.getScriptCache();
+  var cached = cache.get('staff_' + userId);
+  if (cached) {
+    var data = JSON.parse(cached);
+    return data.found ? data : null;
+  }
+
+  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+  var values = sheet.getDataRange().getValues();
+
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][1].toString().trim() === userId &&
+        values[i][2].toString().trim().toLowerCase() === 'active') {
+      var staff = {
+        found:  true,
+        name:   values[i][0].toString().trim(),
+        userId: userId,
+        status: values[i][2].toString().trim(),
+        role:   values[i][3].toString().trim().toLowerCase() || 'staff'
+      };
+      cache.put('staff_' + userId, JSON.stringify(staff), 3600);
+      return staff;
+    }
+  }
+
+  cache.put('staff_' + userId, JSON.stringify({ found: false }), 300);
+  return null;
+}
+
+// ============================
+// ล้าง Staff Cache
+// ============================
+function clearStaffCache(userId) {
+  var cache = CacheService.getScriptCache();
+  cache.remove('staff_' + userId);
 }
 
 // ============================
@@ -99,11 +224,8 @@ function searchByHouse(query) {
     var match = false;
 
     if (house === q) {
-      // แบบที่ 1: ตรงเป๊ะ เช่น 171/1 = 171/1
       match = true;
-
     } else if (house.indexOf('-') !== -1) {
-      // แบบที่ 2: เป็น range เช่น 171/160-164
       var prefix    = house.split('/')[0];
       var rangePart = house.split('/')[1];
       var rangeNums = rangePart.split('-');
@@ -135,32 +257,20 @@ function searchByHouse(query) {
 }
 
 // ============================
-// ตรวจสอบสิทธิ์จาก Sheet: Staff
+// บันทึก Log
 // ============================
-function isAuthorized(userId) {
-  var cache  = CacheService.getScriptCache();
-  var cached = cache.get('auth_' + userId);
-  if (cached) return cached === 'true';
-
-  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
-  var values = sheet.getDataRange().getValues();
-
-  for (var i = 1; i < values.length; i++) {
-    if (values[i][1].toString().trim() === userId &&
-        values[i][2].toString().trim().toLowerCase() === 'active') {
-      cache.put('auth_' + userId, 'true', 3600);
-      return true;
-    }
-  }
-  cache.put('auth_' + userId, 'false', 3600);
-  return false;
+function writeLog(userId, query, result) {
+  var sheet     = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
+  var staff     = getStaff(userId);
+  var staffName = staff ? staff.name : '-';
+  var lineName  = getLineDisplayName(userId);
+  sheet.appendRow([new Date(), userId, staffName, lineName, query, result]);
 }
 
 // ============================
-// ดึงชื่อ LINE Profile
+// ดึงชื่อ LINE Profile (พร้อม Cache)
 // ============================
 function getLineDisplayName(userId) {
-  // เช็ค Cache ก่อน
   var cache  = CacheService.getScriptCache();
   var cached = cache.get('line_name_' + userId);
   if (cached) return cached;
@@ -173,46 +283,11 @@ function getLineDisplayName(userId) {
     });
     var profile     = JSON.parse(response.getContentText());
     var displayName = profile.displayName || userId;
-
-    // Cache ชื่อไว้ 1 ชั่วโมง
     cache.put('line_name_' + userId, displayName, 3600);
     return displayName;
-
   } catch(err) {
     return userId;
   }
-}
-
-// ============================
-// ดึงชื่อจาก Sheet Staff
-// ============================
-function getStaffName(userId) {
-  // เช็ค Cache ก่อน
-  var cache  = CacheService.getScriptCache();
-  var cached = cache.get('staff_name_' + userId);
-  if (cached) return cached;
-
-  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
-  var values = sheet.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
-    if (values[i][1].toString().trim() === userId) {
-      var name = values[i][0].toString().trim();
-      // Cache ชื่อไว้ 1 ชั่วโมง
-      cache.put('staff_name_' + userId, name, 3600);
-      return name;
-    }
-  }
-  return '-';
-}
-
-// ============================
-// บันทึก Log
-// ============================
-function writeLog(userId, query, result) {
-  var sheet     = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
-  var staffName = getStaffName(userId);
-  var lineName  = getLineDisplayName(userId);
-  sheet.appendRow([new Date(), userId, staffName, lineName, query, result]);
 }
 
 // ============================
@@ -236,32 +311,13 @@ function replyToLine(replyToken, message) {
 // Cache ข้อมูลรถ
 // ============================
 function getVehicleData() {
-  var cache      = CacheService.getScriptCache();
-  var chunkSize  = 50; // เก็บครั้งละ 50 แถว
-  var cached0    = cache.get('vehicles_0');
+  var cache  = CacheService.getScriptCache();
+  var cached = cache.get('vehicles');
+  if (cached) return JSON.parse(cached);
 
-  if (cached0) {
-    // ดึงทุก chunk มารวมกัน
-    var all = [];
-    var i   = 0;
-    while (true) {
-      var chunk = cache.get('vehicles_' + i);
-      if (!chunk) break;
-      all = all.concat(JSON.parse(chunk));
-      i++;
-    }
-    return all;
-  }
-
-  // ถ้าไม่มี Cache ค่อยเปิด Sheet แล้วแบ่ง chunk
   var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
   var values = sheet.getDataRange().getValues();
-
-  for (var i = 0; i < values.length; i += chunkSize) {
-    var chunk = values.slice(i, i + chunkSize);
-    cache.put('vehicles_' + (i / chunkSize), JSON.stringify(chunk), 600);
-  }
-
+  cache.put('vehicles', JSON.stringify(values), 600);
   return values;
 }
 
@@ -269,36 +325,5 @@ function getVehicleData() {
 // Keep Alive
 // ============================
 function keepAlive() {
-  // แค่รัน script ให้ตื่นอยู่เสมอ
   Logger.log('keep alive: ' + new Date());
-}
-
-// ============================
-// Auto Delete Log เกิน 90 วัน
-// ============================
-var LOG_RETENTION_DAYS = 1;
-
-function deleteOldLogs() {
-  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
-  var data   = sheet.getDataRange().getValues();
-  var cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - LOG_RETENTION_DAYS);
-
-  var toKeep = [data[0]]; // เก็บ header ไว้เสมอ
-
-  for (var i = 1; i < data.length; i++) {
-    var logDate = new Date(data[i][0]); // คอลัมน์แรก = timestamp
-    if (logDate >= cutoff) {
-      toKeep.push(data[i]);
-    }
-  }
-
-  var deleted = data.length - toKeep.length;
-
-  // เขียนกลับ Sheet
-  sheet.clearContents();
-  sheet.getRange(1, 1, toKeep.length, toKeep[0].length)
-       .setValues(toKeep);
-
-  Logger.log('Deleted: ' + deleted + ' rows | Remaining: ' + (toKeep.length - 1) + ' rows');
 }
