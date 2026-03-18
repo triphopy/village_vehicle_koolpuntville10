@@ -216,10 +216,13 @@ function searchByPlate(query) {
   for (var i = 1; i < values.length; i++) {
     var plate = values[i][0].toString().replace(/\s/g, '').toLowerCase();
     if (plate.includes(q)) {
+      var status    = values[i][6].toString().trim().toLowerCase();
+      var statusMsg = getStatusMessage(status);
       results.push(
         '🚗 ' + values[i][0] + '\n' +
         '    ' + values[i][1] + ' ' + values[i][2] + ' | สี' + values[i][3] + '\n' +
-        '🏠 บ้านเลขที่: ' + values[i][4]
+        '🏠 บ้านเลขที่: ' + values[i][4] + '\n' +
+        statusMsg
       );
     }
   }
@@ -264,9 +267,12 @@ function searchByHouse(query) {
     }
 
     if (match) {
+      var status    = values[i][6].toString().trim().toLowerCase();
+      var statusMsg = getStatusMessage(status);
       results.push(
         '🚗 ' + values[i][0] + '\n' +
-        '    ' + values[i][1] + ' ' + values[i][2] + ' | สี' + values[i][3]
+        '    ' + values[i][1] + ' ' + values[i][2] + ' | สี' + values[i][3] + '\n' +
+        statusMsg
       );
     }
   }
