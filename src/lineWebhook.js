@@ -10,10 +10,9 @@ var LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
 // ============================
 function doPost(e) {
   try {
-    var data = JSON.parse(e.postData.contents);
+    var data  = JSON.parse(e.postData.contents);
     var event = data.events[0];
 
-    // ตอนแอด Bot → ส่ง User ID กลับอัตโนมัติ
     if (event.type === 'follow') {
       replyToLine(event.replyToken,
         '👋 สวัสดีครับ!\n\n' +
@@ -24,11 +23,10 @@ function doPost(e) {
       return;
     }
 
-    if (!event || event.type !== 'message' || event.message.type !== 'text') return;
+    if (!event || event.type !== 'message') return;
 
     var userId     = event.source.userId;
     var replyToken = event.replyToken;
-    var query      = event.message.text.trim();
 
     // ตรวจสอบสิทธิ์
     if (!isAuthorized(userId)) {
@@ -38,15 +36,36 @@ function doPost(e) {
 
     var result = '';
 
-    // แยกประเภทการค้นหา: มี "/" = บ้านเลขที่, อื่นๆ = ทะเบียน
-    if (query.indexOf('/') !== -1) {
-      result = searchByHouse(query);
+    // ✅ รับได้ทั้งข้อความ และรูปภาพ
+    if (event.message.type === 'text') {
+      var query = event.message.text.trim();
+      if (query.indexOf('/') !== -1) {
+        result = searchByHouse(query);
+      } else {
+        result = searchByPlate(query);
+      }
+
+    } else if (event.message.type === 'image') {
+      // รับรูป → ส่ง OCR
+      replyToLine(replyToken, '🔍 กำลังอ่านทะเบียน...');
+      
+      var imageUrl = 'https://api-data.line.me/v2/bot/message/' + event.message.id + '/content';
+      var plate    = ocrLicensePlate(imageUrl);
+
+      if (plate) {
+        result = searchByPlate(plate);
+        result.message = '📷 อ่านทะเบียนได้: ' + plate + '\n\n' + result.message;
+      } else {
+        result = { found: false, message: '❌ ไม่สามารถอ่านทะเบียนได้\nกรุณาพิมพ์เลขทะเบียนแทนครับ' };
+      }
     } else {
-      result = searchByPlate(query);
+      return;
     }
 
-    // บันทึก Log
-    writeLog(userId, query, result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
+    writeLog(userId, 
+      event.message.type === 'image' ? '[รูปภาพ]' : event.message.text, 
+      result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล'
+    );
 
     replyToLine(replyToken, result.message);
 
@@ -233,4 +252,50 @@ function getVehicleData() {
 function keepAlive() {
   // แค่รัน script ให้ตื่นอยู่เสมอ
   Logger.log('keep alive: ' + new Date());
+}
+
+// ============================
+// OCR ทะเบียนรถด้วย Gemini
+// ============================
+function ocrLicensePlate(imageUrl) {
+  try {
+    var apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+    
+    // ดาวน์โหลดรูปจาก LINE
+    var imageResponse = UrlFetchApp.fetch(imageUrl, {
+      headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN }
+    });
+    var imageBase64 = Utilities.base64Encode(imageResponse.getContent());
+    var mimeType    = imageResponse.getHeaders()['Content-Type'] || 'image/jpeg';
+
+    // ส่งรูปให้ Gemini อ่าน
+    var response = UrlFetchApp.fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        contents: [{
+          parts: [
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: imageBase64
+              }
+            },
+            {
+              text: 'อ่านเลขทะเบียนรถในรูปนี้ ตอบแค่เลขทะเบียนเท่านั้น ไม่ต้องมีคำอธิบาย เช่น กข1234 หรือ 1กข234'
+            }
+          ]
+        }]
+      })
+    });
+
+    var result = JSON.parse(response.getContentText());
+    var plate  = result.candidates[0].content.parts[0].text.trim();
+    return plate;
+
+  } catch(err) {
+    Logger.log('OCR Error: ' + err);
+    return null;
+  }
 }
