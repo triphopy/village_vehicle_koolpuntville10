@@ -372,3 +372,12 @@ function clearAllCache() {
   CacheService.getScriptCache().removeAll(keys);
   Logger.log('Cleared ' + keys.length + ' cache keys');
 }
+
+function getStatusMessage(status) {
+  switch(status) {
+    case 'active':    return '✅ สถานะ: อนุญาต';
+    case 'inactive':  return '⛔ สถานะ: ไม่อนุญาต';
+    case 'blacklist': return '🚨 สถานะ: Blacklist';
+    default:          return '❓ สถานะ: ไม่ระบุ';
+  }
+}
