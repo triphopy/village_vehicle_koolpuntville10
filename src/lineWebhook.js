@@ -264,7 +264,7 @@ function ocrLicensePlate(imageUrl) {
     var mimeType    = imageResponse.getHeaders()['Content-Type'] || 'image/jpeg';
 
     var response = UrlFetchApp.fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey, {
       method: 'post',
       contentType: 'application/json',
       payload: JSON.stringify({
