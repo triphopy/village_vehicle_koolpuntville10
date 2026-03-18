@@ -49,22 +49,23 @@ function doPost(e) {
       replyToLine(replyToken, result.message);
 
     } else if (event.message.type === 'image') {
-      // ✅ ตอบ LINE ก่อนเลย ไม่ให้ timeout
       replyToLine(replyToken, '🔍 กำลังอ่านทะเบียน รอสักครู่...');
 
-      // ทำ OCR และ Push ผลลัพธ์ทีหลัง
       var imageUrl = 'https://api-data.line.me/v2/bot/message/' + event.message.id + '/content';
-      var plate    = ocrLicensePlate(imageUrl);
+      var ocr      = ocrLicensePlate(imageUrl);
 
-      if (plate) {
-        result = searchByPlate(plate);
-        result.message = '📷 อ่านทะเบียนได้: ' + plate + '\n\n' + result.message;
+      var resultMsg = '';
+      if (ocr.plate) {
+        result    = searchByPlate(ocr.plate);
+        resultMsg = '📷 อ่านทะเบียนได้: ' + ocr.plate + '\n\n' + result.message;
       } else {
-        result = { found: false, message: '❌ ไม่สามารถอ่านทะเบียนได้\nกรุณาพิมพ์เลขทะเบียนแทนครับ' };
+        result    = { found: false };
+        // ส่ง error กลับมาให้เห็นเลย
+        resultMsg = '❌ OCR Error:\n' + ocr.error;
       }
 
       writeLog(userId, '[รูปภาพ]', result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
-      pushToLine(userId, result.message)
+      pushToLine(userId, resultMsg);
     }
 
   } catch(err) {
@@ -250,16 +251,17 @@ function pushToLine(userId, message) {
 function ocrLicensePlate(imageUrl) {
   try {
     var apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-    Logger.log('API Key: ' + (apiKey ? 'มีค่า' : 'ไม่มีค่า'));
+    if (!apiKey) return { plate: null, error: 'ไม่พบ GEMINI_API_KEY' };
 
     var imageResponse = UrlFetchApp.fetch(imageUrl, {
       headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN }
     });
-    Logger.log('Image fetch status: ' + imageResponse.getResponseCode());
+    if (imageResponse.getResponseCode() !== 200) {
+      return { plate: null, error: 'ดึงรูปไม่ได้ code: ' + imageResponse.getResponseCode() };
+    }
 
     var imageBase64 = Utilities.base64Encode(imageResponse.getContent());
     var mimeType    = imageResponse.getHeaders()['Content-Type'] || 'image/jpeg';
-    Logger.log('MimeType: ' + mimeType);
 
     var response = UrlFetchApp.fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
@@ -274,14 +276,13 @@ function ocrLicensePlate(imageUrl) {
         }]
       })
     });
-    Logger.log('Gemini response: ' + response.getContentText());
 
-    var result = JSON.parse(response.getContentText());
-    return result.candidates[0].content.parts[0].text.trim();
+    var geminiResult = JSON.parse(response.getContentText());
+    var plate = geminiResult.candidates[0].content.parts[0].text.trim();
+    return { plate: plate, error: null };
 
   } catch(err) {
-    Logger.log('OCR Error: ' + err);
-    return null;
+    return { plate: null, error: err.toString() };
   }
 }
 
