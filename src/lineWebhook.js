@@ -239,7 +239,7 @@ function keepAlive() {
 // ============================
 // Auto Delete Log เกิน 90 วัน
 // ============================
-var LOG_RETENTION_DAYS = 90;
+var LOG_RETENTION_DAYS = 1;
 
 function deleteOldLogs() {
   var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
