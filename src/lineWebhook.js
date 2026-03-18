@@ -49,7 +49,10 @@ function doPost(e) {
       replyToLine(replyToken, result.message);
 
     } else if (event.message.type === 'image') {
-      // ค้นหาจากรูปภาพ
+      // ✅ ตอบ LINE ก่อนเลย ไม่ให้ timeout
+      replyToLine(replyToken, '🔍 กำลังอ่านทะเบียน รอสักครู่...');
+
+      // ทำ OCR และ Push ผลลัพธ์ทีหลัง
       var imageUrl = 'https://api-data.line.me/v2/bot/message/' + event.message.id + '/content';
       var plate    = ocrLicensePlate(imageUrl);
 
@@ -59,8 +62,9 @@ function doPost(e) {
       } else {
         result = { found: false, message: '❌ ไม่สามารถอ่านทะเบียนได้\nกรุณาพิมพ์เลขทะเบียนแทนครับ' };
       }
+
       writeLog(userId, '[รูปภาพ]', result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
-      pushToLine(userId, result.message);
+      pushToLine(userId, result.message)
     }
 
   } catch(err) {
