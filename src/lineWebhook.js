@@ -246,12 +246,16 @@ function pushToLine(userId, message) {
 function ocrLicensePlate(imageUrl) {
   try {
     var apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+    Logger.log('API Key: ' + (apiKey ? 'มีค่า' : 'ไม่มีค่า'));
 
     var imageResponse = UrlFetchApp.fetch(imageUrl, {
       headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN }
     });
+    Logger.log('Image fetch status: ' + imageResponse.getResponseCode());
+
     var imageBase64 = Utilities.base64Encode(imageResponse.getContent());
     var mimeType    = imageResponse.getHeaders()['Content-Type'] || 'image/jpeg';
+    Logger.log('MimeType: ' + mimeType);
 
     var response = UrlFetchApp.fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
@@ -260,19 +264,13 @@ function ocrLicensePlate(imageUrl) {
       payload: JSON.stringify({
         contents: [{
           parts: [
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: imageBase64
-              }
-            },
-            {
-              text: 'อ่านเลขทะเบียนรถในรูปนี้ ตอบแค่เลขทะเบียนเท่านั้น ไม่ต้องมีคำอธิบาย เช่น กข1234 หรือ 1กข234'
-            }
+            { inline_data: { mime_type: mimeType, data: imageBase64 } },
+            { text: 'อ่านเลขทะเบียนรถในรูปนี้ ตอบแค่เลขทะเบียนเท่านั้น ไม่ต้องมีคำอธิบาย เช่น กข1234 หรือ 1กข234' }
           ]
         }]
       })
     });
+    Logger.log('Gemini response: ' + response.getContentText());
 
     var result = JSON.parse(response.getContentText());
     return result.candidates[0].content.parts[0].text.trim();
