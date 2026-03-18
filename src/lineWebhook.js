@@ -38,27 +38,21 @@ function doPost(e) {
     }
 
     // Admin Commands
-    if (query.startsWith('/')) {
-      if (staff.role === 'admin') {
-        var cmdResult = handleAdminCommand(query, userId, event);
-        replyToLine(replyToken, cmdResult);
-      } else {
-        replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');
-      }
-      return;
-    }
-
-    // ค่อยเช็คบ้านเลขที่ (มี / แต่ไม่ใช่ command)
-    // เช่น 171/1, 99/1
-    if (query.match(/^\d/)) {
-      // ขึ้นต้นด้วยตัวเลข → อาจเป็นบ้านเลขที่หรือทะเบียน
-      if (query.indexOf('/') !== -1) {
-        result = searchByHouse(query);
-      } else {
-        result = searchByPlate(query);
-      }
+  if (query.startsWith('/')) {
+    if (staff.role === 'admin') {
+      var cmdResult = handleAdminCommand(query, userId, event);
+      replyToLine(replyToken, result);
     } else {
-      // ขึ้นต้นด้วยตัวอักษร → ทะเบียนรถ
+      replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');
+    }
+    return;
+  }
+
+    // ค้นหาปกติ
+    var result = '';
+    if (query.indexOf('/') !== -1) {
+      result = searchByHouse(query);
+    } else {
       result = searchByPlate(query);
     }
 
@@ -73,10 +67,9 @@ function doPost(e) {
 // ============================
 // Admin Commands
 // ============================
-function handleAdminCommand(query, adminId, event) {
-  var parts   = query.split(' ');
-  var cmd     = parts[0].toLowerCase();
-  var groupId = event.source.groupId || null;
+function handleAdminCommand(query, adminId) {
+  var parts = query.split(' ');
+  var cmd   = parts[0].toLowerCase();
 
   // /add <userId> <ชื่อ> <role>
   if (cmd === '/add') {
@@ -157,76 +150,26 @@ function handleAdminCommand(query, adminId, event) {
     return '✅ ล้าง Cache สำเร็จ ' + keys.length + ' รายการ';
   }
 
-  // /whois → ดู members ในกลุ่ม
+  // /whois
   if (cmd === '/whois') {
-    if (!groupId) return '❌ ใช้ได้เฉพาะในกลุ่มเท่านั้น';
-
     try {
-      var response = UrlFetchApp.fetch(
-        'https://api.line.me/v2/bot/group/' + groupId + '/members/ids', {
-        method: 'get',
-        headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN }
-      });
-
-      var data    = JSON.parse(response.getContentText());
-      var members = data.memberIds || [];
-
-      if (members.length === 0) return '❌ ไม่พบสมาชิกในกลุ่ม';
-
-      var lines = ['👥 สมาชิกในกลุ่ม ' + members.length + ' คน\n'];
-
-      members.forEach(function(uid) {
-        var staff = getStaff(uid);
-        if (staff) {
-          lines.push('✅ ' + staff.name + ' (' + staff.role + ')\n    ' + uid);
-        } else {
-          lines.push('❓ ไม่มีสิทธิ์\n    ' + uid);
-        }
-      });
-
-      return lines.join('\n');
-
+      var groupId = null;
+      // ดึง groupId จาก event (ต้องส่งมาด้วย)
+      // แก้ doPost ให้ส่ง groupId มาด้วย (ดูด้านล่าง)
+      return '❌ ใช้ได้เฉพาะในกลุ่มเท่านั้น';
     } catch(err) {
       return '❌ Error: ' + err.toString();
     }
   }
 
-  // /myid → ทุกคนใช้ได้
-  if (query === '/myid') {
-    var myInfo = ['📋 ข้อมูลของคุณ\n'];
-    myInfo.push('👤 User ID: ' + userId);
-
-    var staffInfo = getStaff(userId);
-    if (staffInfo) {
-      myInfo.push('📝 ชื่อ: ' + staffInfo.name);
-      myInfo.push('🔑 Role: ' + staffInfo.role);
-      myInfo.push('🟢 Status: ' + staffInfo.status);
-    } else {
-      myInfo.push('⚠️ ยังไม่มีสิทธิ์ในระบบ');
-    }
-
-    if (isGroup) {
-      myInfo.push('💬 Group ID: ' + event.source.groupId);
-    }
-
-    replyToLine(replyToken, myInfo.join('\n'));
-    return;
-  }
-
   // /help
   if (cmd === '/help') {
     return '📋 คำสั่งที่ใช้ได้\n\n' +
-          '👤 ทุกคน\n' +
-          '/myid - ดู User ID ของตัวเอง\n\n' +
-          '👑 Admin เท่านั้น\n' +
-          '/add <userId> <ชื่อ> <role>\n' +
-          '/remove <userId>\n' +
-          '/list\n' +
-          '/status <userId>\n' +
-          '/whois - ดู UID สมาชิกในกลุ่ม\n' +
-          '/log <จำนวน>\n' +
-          '/clearcache\n' +
-          '/debug';
+           '/add <userId> <ชื่อ> <role>\n' +
+           '/remove <userId>\n' +
+           '/list\n' +
+           '/status <userId>\n' +
+           '/clearcache';
   }
 
   return '❌ ไม่รู้จักคำสั่งนี้\nพิมพ์ /help เพื่อดูคำสั่งทั้งหมด';
