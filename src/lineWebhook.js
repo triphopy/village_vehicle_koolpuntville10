@@ -38,21 +38,27 @@ function doPost(e) {
     }
 
     // Admin Commands
-  if (query.startsWith('/')) {
-    if (staff.role === 'admin') {
-      var cmdResult = handleAdminCommand(query, userId, event);
-      replyToLine(replyToken, result);
-    } else {
-      replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');
+    if (query.startsWith('/')) {
+      if (staff.role === 'admin') {
+        var cmdResult = handleAdminCommand(query, userId, event);
+        replyToLine(replyToken, cmdResult);
+      } else {
+        replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');
+      }
+      return;
     }
-    return;
-  }
 
-    // ค้นหาปกติ
-    var result = '';
-    if (query.indexOf('/') !== -1) {
-      result = searchByHouse(query);
+    // ค่อยเช็คบ้านเลขที่ (มี / แต่ไม่ใช่ command)
+    // เช่น 171/1, 99/1
+    if (query.match(/^\d/)) {
+      // ขึ้นต้นด้วยตัวเลข → อาจเป็นบ้านเลขที่หรือทะเบียน
+      if (query.indexOf('/') !== -1) {
+        result = searchByHouse(query);
+      } else {
+        result = searchByPlate(query);
+      }
     } else {
+      // ขึ้นต้นด้วยตัวอักษร → ทะเบียนรถ
       result = searchByPlate(query);
     }
 
@@ -206,7 +212,7 @@ function handleAdminCommand(query, adminId, event) {
     replyToLine(replyToken, myInfo.join('\n'));
     return;
   }
-  
+
   // /help
   if (cmd === '/help') {
     return '📋 คำสั่งที่ใช้ได้\n\n' +
