@@ -10,9 +10,10 @@ var LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
 // ============================
 function doPost(e) {
   try {
-    var data  = JSON.parse(e.postData.contents);
+    var data = JSON.parse(e.postData.contents);
     var event = data.events[0];
 
+    // ตอนแอด Bot → ส่ง User ID กลับอัตโนมัติ
     if (event.type === 'follow') {
       replyToLine(event.replyToken,
         '👋 สวัสดีครับ!\n\n' +
@@ -36,19 +37,19 @@ function doPost(e) {
 
     var result = '';
 
-    // ✅ รับได้ทั้งข้อความ และรูปภาพ
     if (event.message.type === 'text') {
+      // ค้นหาจากข้อความ
       var query = event.message.text.trim();
       if (query.indexOf('/') !== -1) {
         result = searchByHouse(query);
       } else {
         result = searchByPlate(query);
       }
+      writeLog(userId, query, result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
+      replyToLine(replyToken, result.message);
 
     } else if (event.message.type === 'image') {
-      // รับรูป → ส่ง OCR
-      replyToLine(replyToken, '🔍 กำลังอ่านทะเบียน...');
-      
+      // ค้นหาจากรูปภาพ
       var imageUrl = 'https://api-data.line.me/v2/bot/message/' + event.message.id + '/content';
       var plate    = ocrLicensePlate(imageUrl);
 
@@ -58,16 +59,9 @@ function doPost(e) {
       } else {
         result = { found: false, message: '❌ ไม่สามารถอ่านทะเบียนได้\nกรุณาพิมพ์เลขทะเบียนแทนครับ' };
       }
-    } else {
-      return;
+      writeLog(userId, '[รูปภาพ]', result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
+      pushToLine(userId, result.message);
     }
-
-    writeLog(userId, 
-      event.message.type === 'image' ? '[รูปภาพ]' : event.message.text, 
-      result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล'
-    );
-
-    replyToLine(replyToken, result.message);
 
   } catch(err) {
     Logger.log(err);
@@ -123,16 +117,13 @@ function searchByHouse(query) {
 
     } else if (house.indexOf('-') !== -1) {
       // แบบที่ 2: เป็น range เช่น 171/160-164
-      // แยก prefix กับ range ออกมา
-      var prefix = house.split('/')[0]; // "171"
-      var rangePart = house.split('/')[1]; // "160-164"
-      var rangeNums = rangePart.split('-'); // ["160", "164"]
-
-      // เช็คว่า query อยู่ใน prefix เดียวกันไหม
-      var qPrefix = q.split('/')[0]; // "171"
-      var qNum    = parseInt(q.split('/')[1]); // 160
-      var rangeMin = parseInt(rangeNums[0]); // 160
-      var rangeMax = parseInt(rangeNums[1]); // 164
+      var prefix    = house.split('/')[0];
+      var rangePart = house.split('/')[1];
+      var rangeNums = rangePart.split('-');
+      var qPrefix   = q.split('/')[0];
+      var qNum      = parseInt(q.split('/')[1]);
+      var rangeMin  = parseInt(rangeNums[0]);
+      var rangeMax  = parseInt(rangeNums[1]);
 
       if (qPrefix === prefix && qNum >= rangeMin && qNum <= rangeMax) {
         match = true;
@@ -199,7 +190,7 @@ function getStaffName(userId) {
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (values[i][1].toString().trim() === userId) {
-      return values[i][0].toString().trim(); // คอลัมน์ name
+      return values[i][0].toString().trim();
     }
   }
   return '-';
@@ -216,7 +207,7 @@ function writeLog(userId, query, result) {
 }
 
 // ============================
-// ส่งข้อความกลับ LINE
+// ส่งข้อความกลับ LINE (Reply)
 // ============================
 function replyToLine(replyToken, message) {
   UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
@@ -232,26 +223,21 @@ function replyToLine(replyToken, message) {
   });
 }
 
-function getVehicleData() {
-  var cache = CacheService.getScriptCache();
-  var cached = cache.get('vehicles');
-  
-  if (cached) {
-    return JSON.parse(cached); // ดึงจาก Cache เร็วมาก
-  }
-  
-  // ถ้าไม่มี Cache ค่อยเปิด Sheet
-  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
-  var values = sheet.getDataRange().getValues();
-  
-  // เก็บ Cache ไว้ 10 นาที
-  cache.put('vehicles', JSON.stringify(values), 600);
-  return values;
-}
-
-function keepAlive() {
-  // แค่รัน script ให้ตื่นอยู่เสมอ
-  Logger.log('keep alive: ' + new Date());
+// ============================
+// ส่งข้อความ LINE (Push)
+// ============================
+function pushToLine(userId, message) {
+  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN
+    },
+    payload: JSON.stringify({
+      to: userId,
+      messages: [{ type: 'text', text: message }]
+    })
+  });
 }
 
 // ============================
@@ -260,15 +246,13 @@ function keepAlive() {
 function ocrLicensePlate(imageUrl) {
   try {
     var apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-    
-    // ดาวน์โหลดรูปจาก LINE
+
     var imageResponse = UrlFetchApp.fetch(imageUrl, {
       headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN }
     });
     var imageBase64 = Utilities.base64Encode(imageResponse.getContent());
     var mimeType    = imageResponse.getHeaders()['Content-Type'] || 'image/jpeg';
 
-    // ส่งรูปให้ Gemini อ่าน
     var response = UrlFetchApp.fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
       method: 'post',
@@ -291,11 +275,34 @@ function ocrLicensePlate(imageUrl) {
     });
 
     var result = JSON.parse(response.getContentText());
-    var plate  = result.candidates[0].content.parts[0].text.trim();
-    return plate;
+    return result.candidates[0].content.parts[0].text.trim();
 
   } catch(err) {
     Logger.log('OCR Error: ' + err);
     return null;
   }
+}
+
+// ============================
+// Cache ข้อมูลรถ
+// ============================
+function getVehicleData() {
+  var cache  = CacheService.getScriptCache();
+  var cached = cache.get('vehicles');
+
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
+  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
+  var values = sheet.getDataRange().getValues();
+  cache.put('vehicles', JSON.stringify(values), 600);
+  return values;
+}
+
+// ============================
+// Keep Alive
+// ============================
+function keepAlive() {
+  Logger.log('keep alive: ' + new Date());
 }
