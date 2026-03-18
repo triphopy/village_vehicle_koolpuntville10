@@ -1,5 +1,5 @@
 // ============================
-// ตั้งค่าตรงนี้ก่อนใช้งาน
+// ตั้งค่าตรงนี้ก่อนใช้งานใหม่
 // ============================
 var props = PropertiesService.getScriptProperties();
 var LINE_ACCESS_TOKEN   = props.getProperty('LINE_ACCESS_TOKEN');
@@ -13,6 +13,13 @@ function doPost(e) {
     var data  = JSON.parse(e.postData.contents);
     var event = data.events[0];
 
+    if (!event) {
+      Logger.log('no event');
+      return;
+    }
+    Logger.log('event type: ' + event.type);
+    Logger.log('raw: ' + JSON.stringify(event));
+    
     // ตอนแอด Bot → ส่ง User ID กลับอัตโนมัติ
     if (event.type === 'follow') {
       replyToLine(event.replyToken,
