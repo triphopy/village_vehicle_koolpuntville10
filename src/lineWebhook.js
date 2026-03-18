@@ -138,15 +138,21 @@ function searchByHouse(query) {
 // ตรวจสอบสิทธิ์จาก Sheet: Staff
 // ============================
 function isAuthorized(userId) {
+  var cache  = CacheService.getScriptCache();
+  var cached = cache.get('auth_' + userId);
+  if (cached) return cached === 'true';
+
   var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
   var values = sheet.getDataRange().getValues();
 
   for (var i = 1; i < values.length; i++) {
     if (values[i][1].toString().trim() === userId &&
         values[i][2].toString().trim().toLowerCase() === 'active') {
+      cache.put('auth_' + userId, 'true', 3600);
       return true;
     }
   }
+  cache.put('auth_' + userId, 'false', 3600);
   return false;
 }
 
@@ -181,11 +187,19 @@ function getLineDisplayName(userId) {
 // ดึงชื่อจาก Sheet Staff
 // ============================
 function getStaffName(userId) {
+  // เช็ค Cache ก่อน
+  var cache  = CacheService.getScriptCache();
+  var cached = cache.get('staff_name_' + userId);
+  if (cached) return cached;
+
   var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (values[i][1].toString().trim() === userId) {
-      return values[i][0].toString().trim();
+      var name = values[i][0].toString().trim();
+      // Cache ชื่อไว้ 1 ชั่วโมง
+      cache.put('staff_name_' + userId, name, 3600);
+      return name;
     }
   }
   return '-';
@@ -222,19 +236,32 @@ function replyToLine(replyToken, message) {
 // Cache ข้อมูลรถ
 // ============================
 function getVehicleData() {
-  var cache = CacheService.getScriptCache();
-  var cached = cache.get('vehicles');
-  
-  if (cached) {
-    return JSON.parse(cached); // ดึงจาก Cache เร็วมาก
+  var cache      = CacheService.getScriptCache();
+  var chunkSize  = 50; // เก็บครั้งละ 50 แถว
+  var cached0    = cache.get('vehicles_0');
+
+  if (cached0) {
+    // ดึงทุก chunk มารวมกัน
+    var all = [];
+    var i   = 0;
+    while (true) {
+      var chunk = cache.get('vehicles_' + i);
+      if (!chunk) break;
+      all = all.concat(JSON.parse(chunk));
+      i++;
+    }
+    return all;
   }
-  
-  // ถ้าไม่มี Cache ค่อยเปิด Sheet
+
+  // ถ้าไม่มี Cache ค่อยเปิด Sheet แล้วแบ่ง chunk
   var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
   var values = sheet.getDataRange().getValues();
-  
-  // เก็บ Cache ไว้ 10 นาที
-  cache.put('vehicles', JSON.stringify(values), 600);
+
+  for (var i = 0; i < values.length; i += chunkSize) {
+    var chunk = values.slice(i, i + chunkSize);
+    cache.put('vehicles_' + (i / chunkSize), JSON.stringify(chunk), 600);
+  }
+
   return values;
 }
 
