@@ -60,7 +60,7 @@ function doPost(e) {
 // ============================
 function searchByPlate(query) {
   var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
-  var values = sheet.getDataRange().getValues();
+  var values = getVehicleData();
   var q      = query.replace(/\s/g, '').toLowerCase();
 
   for (var i = 1; i < values.length; i++) {
@@ -81,7 +81,7 @@ function searchByPlate(query) {
 // ============================
 function searchByHouse(query) {
   var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
-  var values = sheet.getDataRange().getValues();
+  var values = getVehicleData();
   var results = [];
 
   for (var i = 1; i < values.length; i++) {
@@ -172,4 +172,21 @@ function replyToLine(replyToken, message) {
       messages: [{ type: 'text', text: message }]
     })
   });
+}
+
+function getVehicleData() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('vehicles');
+  
+  if (cached) {
+    return JSON.parse(cached); // ดึงจาก Cache เร็วมาก
+  }
+  
+  // ถ้าไม่มี Cache ค่อยเปิด Sheet
+  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
+  var values = sheet.getDataRange().getValues();
+  
+  // เก็บ Cache ไว้ 10 นาที
+  cache.put('vehicles', JSON.stringify(values), 600);
+  return values;
 }
