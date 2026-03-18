@@ -190,3 +190,8 @@ function getVehicleData() {
   cache.put('vehicles', JSON.stringify(values), 600);
   return values;
 }
+
+function keepAlive() {
+  // แค่รัน script ให้ตื่นอยู่เสมอ
+  Logger.log('keep alive: ' + new Date());
+}
