@@ -39,14 +39,14 @@ function doPost(e) {
 
     // Admin Commands
   if (query.startsWith('/')) {
-  if (staff.role === 'admin') {
-    var result = handleAdminCommand(query, userId);
-    replyToLine(replyToken, result);
-  } else {
-    replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');
+    if (staff.role === 'admin') {
+      var result = handleAdminCommand(query, userId);
+      replyToLine(replyToken, result);
+    } else {
+      replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');
+    }
+    return;
   }
-  return;
-}
 
     // ค้นหาปกติ
     var result = '';
@@ -72,7 +72,6 @@ function handleAdminCommand(query, adminId) {
   var cmd   = parts[0].toLowerCase();
 
   // /add <userId> <ชื่อ> <role>
-  // เช่น /add U578c3f... สมชาย staff
   if (cmd === '/add') {
     if (parts.length < 4) return '❌ รูปแบบไม่ถูกต้อง\nใช้: /add <userId> <ชื่อ> <role>\nเช่น: /add U578c3f... สมชาย staff';
     var newId   = parts[1].trim();
@@ -134,7 +133,34 @@ function handleAdminCommand(query, adminId) {
     return '📋 ' + staff.name + '\nRole: ' + staff.role + '\nStatus: ' + staff.status;
   }
 
-  return '❌ ไม่รู้จักคำสั่งนี้\nคำสั่งที่ใช้ได้: /add /remove /list /status';
+  // /clearcache
+  if (cmd === '/clearcache') {
+    var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+    var values = sheet.getDataRange().getValues();
+    var keys   = ['vehicles'];
+
+    for (var i = 1; i < values.length; i++) {
+      if (values[i][1]) {
+        keys.push('staff_' + values[i][1].toString().trim());
+        keys.push('line_name_' + values[i][1].toString().trim());
+      }
+    }
+
+    CacheService.getScriptCache().removeAll(keys);
+    return '✅ ล้าง Cache สำเร็จ ' + keys.length + ' รายการ';
+  }
+
+  // /help
+  if (cmd === '/help') {
+    return '📋 คำสั่งที่ใช้ได้\n\n' +
+           '/add <userId> <ชื่อ> <role>\n' +
+           '/remove <userId>\n' +
+           '/list\n' +
+           '/status <userId>\n' +
+           '/clearcache';
+  }
+
+  return '❌ ไม่รู้จักคำสั่งนี้\nพิมพ์ /help เพื่อดูคำสั่งทั้งหมด';
 }
 
 // ============================
