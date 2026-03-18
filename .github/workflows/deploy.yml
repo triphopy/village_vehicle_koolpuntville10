@@ -1,0 +1,77 @@
+name: Deploy to Google Apps Script
+
+on:
+  push:
+    branches:
+      - main  # deploy อัตโนมัติทุกครั้งที่ push ขึ้น main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Write .clasprc.json
+        run: echo '${{ secrets.CLASP_TOKEN }}' > ~/.clasprc.json
+
+      - name: Write .clasp.json
+        run: |
+          echo '{
+            "scriptId": "${{ secrets.SCRIPT_ID }}",
+            "rootDir": "./src"
+          }' > .clasp.json
+
+      - name: Push to Apps Script
+        run: clasp push --force
+
+      - name: Deploy new version
+        run: clasp deploy --description "Auto deploy from GitHub Actions"
+```
+
+---
+
+### Step 4: โครงสร้างโปรเจกต์
+```
+line-bot/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml
+├── src/
+│   └── Code.js        ← Apps Script code อยู่ที่นี่
+├── .clasp.json
+├── .gitignore
+└── README.md
+```
+
+---
+
+### Step 5: .gitignore
+
+สร้างไฟล์ `.gitignore` เพื่อไม่ให้ข้อมูลสำคัญขึ้น GitHub
+```
+.clasprc.json
+.clasp.json
+node_modules/
+```
+
+---
+
+## Workflow หลังจากนี้
+```
+แก้ Code ใน src/Code.js
+    ↓
+git add . && git commit -m "fix: ..." && git push
+    ↓
+GitHub Actions รัน auto
+    ↓
+clasp push + deploy ขึ้น Apps Script อัตโนมัติ ✅

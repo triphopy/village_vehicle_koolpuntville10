@@ -1,5 +1,5 @@
 // ============================
-// ตั้งค่าตรงนี้ก่อนใช้งานทดสอบ
+// ตั้งค่าตรงนี้ก่อนใช้งาน
 // ============================
 var props = PropertiesService.getScriptProperties();
 var LINE_ACCESS_TOKEN  = props.getProperty('LINE_ACCESS_TOKEN');
