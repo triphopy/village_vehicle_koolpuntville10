@@ -1,0 +1,175 @@
+// ============================
+// ตั้งค่าตรงนี้ก่อนใช้งาน
+// ============================
+var props = PropertiesService.getScriptProperties();
+var LINE_ACCESS_TOKEN  = props.getProperty('LINE_ACCESS_TOKEN');
+var LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
+
+// ============================
+// รับข้อความจาก LINE
+// ============================
+function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var event = data.events[0];
+
+    // ตอนแอด Bot → ส่ง User ID กลับอัตโนมัติ
+    if (event.type === 'follow') {
+      replyToLine(event.replyToken,
+        '👋 สวัสดีครับ!\n\n' +
+        '📋 User ID ของคุณคือ:\n' +
+        event.source.userId + '\n\n' +
+        'กรุณาแจ้ง ID นี้กับนิติบุคคลเพื่อเปิดสิทธิ์ใช้งานครับ'
+      );
+      return;
+    }
+
+    if (!event || event.type !== 'message' || event.message.type !== 'text') return;
+
+    var userId     = event.source.userId;
+    var replyToken = event.replyToken;
+    var query      = event.message.text.trim();
+
+    // ตรวจสอบสิทธิ์
+    if (!isAuthorized(userId)) {
+      replyToLine(replyToken, '🚫 ไม่มีสิทธิ์เข้าถึงระบบ\nกรุณาติดต่อนิติบุคคล');
+      return;
+    }
+
+    var result = '';
+
+    // แยกประเภทการค้นหา: มี "/" = บ้านเลขที่, อื่นๆ = ทะเบียน
+    if (query.indexOf('/') !== -1) {
+      result = searchByHouse(query);
+    } else {
+      result = searchByPlate(query);
+    }
+
+    // บันทึก Log
+    writeLog(userId, query, result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
+
+    replyToLine(replyToken, result.message);
+
+  } catch(err) {
+    Logger.log(err);
+  }
+}
+
+// ============================
+// ค้นหาจากทะเบียนรถ
+// ============================
+function searchByPlate(query) {
+  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
+  var values = sheet.getDataRange().getValues();
+  var q      = query.replace(/\s/g, '').toLowerCase();
+
+  for (var i = 1; i < values.length; i++) {
+    var plate = values[i][0].toString().replace(/\s/g, '').toLowerCase();
+    if (plate.includes(q)) {
+      var msg = '✅ พบข้อมูลในระบบ\n\n' +
+                '🚗 ' + values[i][0] + '\n' +
+                '    ' + values[i][1] + ' ' + values[i][2] + ' | สี' + values[i][3] + '\n' +
+                '🏠 บ้านเลขที่: ' + values[i][4];
+      return { found: true, message: msg };
+    }
+  }
+  return { found: false, message: '❌ ไม่พบทะเบียนนี้ในระบบ\nกรุณาแลกบัตรตามขั้นตอนปกติ' };
+}
+
+// ============================
+// ค้นหาจากบ้านเลขที่
+// ============================
+function searchByHouse(query) {
+  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
+  var values = sheet.getDataRange().getValues();
+  var results = [];
+
+  for (var i = 1; i < values.length; i++) {
+    var house = values[i][4].toString().trim();
+    if (house === query.trim()) {
+      results.push('🚗 ' + values[i][0] + ' | ' + values[i][1] + ' ' + values[i][2] + ' | สี' + values[i][3]);
+    }
+  }
+
+  if (results.length > 0) {
+    var msg = '🏠 บ้านเลขที่ ' + query + ' พบรถ ' + results.length + ' คัน\n\n' + results.join('\n');
+    return { found: true, message: msg };
+  }
+  return { found: false, message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ' };
+}
+
+// ============================
+// ตรวจสอบสิทธิ์จาก Sheet: Staff
+// ============================
+function isAuthorized(userId) {
+  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+  var values = sheet.getDataRange().getValues();
+
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][1].toString().trim() === userId &&
+        values[i][2].toString().trim().toLowerCase() === 'active') {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ============================
+// ดึงชื่อ LINE Profile
+// ============================
+function getLineDisplayName(userId) {
+  try {
+    var response = UrlFetchApp.fetch(
+      'https://api.line.me/v2/bot/profile/' + userId, {
+      method: 'get',
+      headers: {
+        'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN
+      }
+    });
+    var profile = JSON.parse(response.getContentText());
+    return profile.displayName || userId;
+  } catch(err) {
+    return userId; // ถ้าดึงไม่ได้ให้ใช้ userId แทน
+  }
+}
+
+// ============================
+// ดึงชื่อจาก Sheet Staff
+// ============================
+function getStaffName(userId) {
+  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][1].toString().trim() === userId) {
+      return values[i][0].toString().trim(); // คอลัมน์ name
+    }
+  }
+  return '-';
+}
+
+// ============================
+// บันทึก Log
+// ============================
+function writeLog(userId, query, result) {
+  var sheet     = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
+  var staffName = getStaffName(userId);
+  var lineName  = getLineDisplayName(userId);
+  sheet.appendRow([new Date(), userId, staffName, lineName, query, result]);
+}
+
+// ============================
+// ส่งข้อความกลับ LINE
+// ============================
+function replyToLine(replyToken, message) {
+  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN
+    },
+    payload: JSON.stringify({
+      replyToken: replyToken,
+      messages: [{ type: 'text', text: message }]
+    })
+  });
+}
