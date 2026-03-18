@@ -89,21 +89,51 @@ function searchByPlate(query) {
 // ค้นหาจากบ้านเลขที่
 // ============================
 function searchByHouse(query) {
-  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
-  var values = getVehicleData();
+  var sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Vehicles');
+  var values  = sheet.getDataRange().getValues();
+  var q       = query.trim();
   var results = [];
 
   for (var i = 1; i < values.length; i++) {
     var house = values[i][4].toString().trim();
-    if (house === query.trim()) {
-      results.push('🚗 ' + values[i][0] + ' | ' + values[i][1] + ' ' + values[i][2] + ' | สี' + values[i][3]);
+    var match = false;
+
+    if (house === q) {
+      // แบบที่ 1: ตรงเป๊ะ เช่น 171/1 = 171/1
+      match = true;
+
+    } else if (house.indexOf('-') !== -1) {
+      // แบบที่ 2: เป็น range เช่น 171/160-164
+      // แยก prefix กับ range ออกมา
+      var prefix = house.split('/')[0]; // "171"
+      var rangePart = house.split('/')[1]; // "160-164"
+      var rangeNums = rangePart.split('-'); // ["160", "164"]
+
+      // เช็คว่า query อยู่ใน prefix เดียวกันไหม
+      var qPrefix = q.split('/')[0]; // "171"
+      var qNum    = parseInt(q.split('/')[1]); // 160
+      var rangeMin = parseInt(rangeNums[0]); // 160
+      var rangeMax = parseInt(rangeNums[1]); // 164
+
+      if (qPrefix === prefix && qNum >= rangeMin && qNum <= rangeMax) {
+        match = true;
+      }
+    }
+
+    if (match) {
+      results.push(
+        '🚗 ' + values[i][0] + '\n' +
+        '    ' + values[i][1] + ' ' + values[i][2] + ' | สี' + values[i][3]
+      );
     }
   }
 
   if (results.length > 0) {
-    var msg = '🏠 บ้านเลขที่ ' + query + ' พบรถ ' + results.length + ' คัน\n\n' + results.join('\n');
+    var msg = '🏠 บ้านเลขที่ ' + query + ' พบรถ ' + results.length + ' คัน\n\n' +
+              results.join('\n\n');
     return { found: true, message: msg };
   }
+
   return { found: false, message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ' };
 }
 
