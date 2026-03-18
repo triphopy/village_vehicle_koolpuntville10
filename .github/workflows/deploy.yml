@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'feature/**'   # ← เพิ่ม: trigger บน feature branch ด้วย
 
 jobs:
   deploy:
@@ -26,8 +27,19 @@ jobs:
 
       - name: Write .clasp.json
         run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            SCRIPT_ID="${{ secrets.SCRIPT_ID_BLUE }}"
+            ENV_LABEL="🔵 BLUE (Production)"
+          else
+            SCRIPT_ID="${{ secrets.SCRIPT_ID_GREEN }}"
+            ENV_LABEL="🟢 GREEN (Staging)"
+          fi
+
+          echo "Deploying to $ENV_LABEL"
+          echo "ScriptId: $SCRIPT_ID"
+
           echo '{
-            "scriptId": "${{ secrets.SCRIPT_ID }}",
+            "scriptId": "'"$SCRIPT_ID"'",
             "rootDir": "./src"
           }' > .clasp.json
 
