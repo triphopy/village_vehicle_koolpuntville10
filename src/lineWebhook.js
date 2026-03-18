@@ -40,8 +40,8 @@ function doPost(e) {
     // Admin Commands
   if (query.startsWith('/')) {
     if (staff.role === 'admin') {
-      var cmdResult = handleAdminCommand(query, userId, event);
-      replyToLine(replyToken, result);
+      var cmdResult = handleAdminCommand(query, userId);
+      replyToLine(replyToken, cmdResult);
     } else {
       replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');
     }
@@ -148,18 +148,6 @@ function handleAdminCommand(query, adminId) {
 
     CacheService.getScriptCache().removeAll(keys);
     return '✅ ล้าง Cache สำเร็จ ' + keys.length + ' รายการ';
-  }
-
-  // /whois
-  if (cmd === '/whois') {
-    try {
-      var groupId = null;
-      // ดึง groupId จาก event (ต้องส่งมาด้วย)
-      // แก้ doPost ให้ส่ง groupId มาด้วย (ดูด้านล่าง)
-      return '❌ ใช้ได้เฉพาะในกลุ่มเท่านั้น';
-    } catch(err) {
-      return '❌ Error: ' + err.toString();
-    }
   }
 
   // /help
