@@ -235,3 +235,33 @@ function keepAlive() {
   // แค่รัน script ให้ตื่นอยู่เสมอ
   Logger.log('keep alive: ' + new Date());
 }
+
+// ============================
+// Auto Delete Log เกิน 90 วัน
+// ============================
+var LOG_RETENTION_DAYS = 90;
+
+function deleteOldLogs() {
+  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
+  var data   = sheet.getDataRange().getValues();
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - LOG_RETENTION_DAYS);
+
+  var toKeep = [data[0]]; // เก็บ header ไว้เสมอ
+
+  for (var i = 1; i < data.length; i++) {
+    var logDate = new Date(data[i][0]); // คอลัมน์แรก = timestamp
+    if (logDate >= cutoff) {
+      toKeep.push(data[i]);
+    }
+  }
+
+  var deleted = data.length - toKeep.length;
+
+  // เขียนกลับ Sheet
+  sheet.clearContents();
+  sheet.getRange(1, 1, toKeep.length, toKeep[0].length)
+       .setValues(toKeep);
+
+  Logger.log('Deleted: ' + deleted + ' rows | Remaining: ' + (toKeep.length - 1) + ' rows');
+}
