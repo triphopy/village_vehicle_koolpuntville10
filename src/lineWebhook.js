@@ -9,6 +9,8 @@ const props               = PropertiesService.getScriptProperties();
 const LINE_ACCESS_TOKEN   = props.getProperty('LINE_ACCESS_TOKEN');
 const LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
 const RETENTION_DAYS      = Number(props.getProperty('LOG_RETENTION_DAYS')) || 30;
+const BACKUPRETENTION_DAYS      = Number(props.getProperty('BACKUP_RETENTION_DAYS')) || 30;
+
 const CACHE_TIME          = 3600;
 const BACKUP_FOLDER_NAME  = props.getProperty('BACKUP_FOLDER_NAME');
 
@@ -534,7 +536,7 @@ function cleanOldBackups() {
   const folder = getOrCreateBackupFolder(); // ← เปลี่ยนจาก getFolderById('FOLDER_ID')
   const files = folder.getFiles();
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - RETENTION_DAYS); // ← ใช้ตัวแปรที่มีอยู่แล้ว
+  cutoff.setDate(cutoff.getDate() - BACKUPRETENTION_DAYS); // ← ใช้ตัวแปรที่มีอยู่แล้ว
 
   while (files.hasNext()) {
     const file = files.next();
@@ -542,7 +544,7 @@ function cleanOldBackups() {
       file.setTrashed(true);
     }
   }
-  console.log('✅ ลบ Backup เก่าเกิน ' + RETENTION_DAYS + ' วันแล้ว');
+  console.log('✅ ลบ Backup เก่าเกิน ' + BACKUPRETENTION_DAYS + ' วันแล้ว');
 }
 
 function dailyMaintenance() {
