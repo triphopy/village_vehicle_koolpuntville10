@@ -1,5 +1,5 @@
 /**
- * 🏢 Vehicle Verification System (Full Version: Group Event + UID Tracking)
+ * 🏢 Vehicle Verification System (Group Event + UID Tracking)
  */
 
 // ============================
