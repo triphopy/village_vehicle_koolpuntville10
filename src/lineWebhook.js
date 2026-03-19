@@ -18,7 +18,6 @@ function doPost(e) {
     data.events.forEach(event => {
       const userId     = event.source.userId;
       const replyToken = event.replyToken;
-      const isGroup    = !!event.source.groupId;
 
       if (!userId) return;
 
@@ -33,10 +32,8 @@ function doPost(e) {
 
       if (event.type !== 'message' || event.message.type !== 'text') return;
 
-      let query = event.message.text.trim();
-
-      // Track ผู้ใช้
-      const lineName = userId ? getLineDisplayName(userId) : "Someone in Group";
+      const query    = event.message.text.trim();
+      const lineName = getLineDisplayName(userId);
       trackUser(userId, lineName);
 
       // /myid → ทุกคนใช้ได้
@@ -45,12 +42,12 @@ function doPost(e) {
         const lines     = ['📋 ข้อมูลของคุณ\n'];
         lines.push('👤 User ID: ' + userId);
         if (staffInfo) {
-          lines.push('📝 ชื่อ: ' + staffInfo.name);
-          lines.push('🔑 Role: ' + staffInfo.role);
+          lines.push('📝 ชื่อ: '  + staffInfo.name);
+          lines.push('🔑 Role: '  + staffInfo.role);
+          lines.push('🟢 Status: active');
         } else {
           lines.push('⚠️ ยังไม่มีสิทธิ์ในระบบ');
         }
-        if (isGroup) lines.push('💬 Group ID: ' + event.source.groupId);
         return replyToLine(replyToken, lines.join('\n'));
       }
 
@@ -132,6 +129,42 @@ function handleAdminCommand(query, adminId, event) {
       return '❌ ไม่พบ User ID นี้ในระบบ';
     }
 
+    // /setstatus <userId> <active|inactive>
+    case '/setstatus': {
+      if (parts.length < 3) return '❌ รูปแบบ:\n/setstatus <userId> <active|inactive>';
+      const targetId  = parts[1].trim();
+      const newStatus = parts[2].trim().toLowerCase();
+      if (newStatus !== 'active' && newStatus !== 'inactive') return '❌ status ต้องเป็น active หรือ inactive';
+      const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+      const values = sheet.getDataRange().getValues();
+      for (let i = 1; i < values.length; i++) {
+        if (values[i][1].toString().trim() === targetId) {
+          sheet.getRange(i + 1, 3).setValue(newStatus);
+          clearStaffCache(targetId);
+          return '✅ เปลี่ยน status ของ ' + values[i][0] + ' เป็น ' + newStatus + ' แล้ว';
+        }
+      }
+      return '❌ ไม่พบ User ID นี้ในระบบ';
+    }
+
+    // /setrole <userId> <admin|staff>
+    case '/setrole': {
+      if (parts.length < 3) return '❌ รูปแบบ:\n/setrole <userId> <admin|staff>';
+      const targetId = parts[1].trim();
+      const newRole  = parts[2].trim().toLowerCase();
+      if (newRole !== 'admin' && newRole !== 'staff') return '❌ role ต้องเป็น admin หรือ staff เท่านั้น';
+      const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+      const values = sheet.getDataRange().getValues();
+      for (let i = 1; i < values.length; i++) {
+        if (values[i][1].toString().trim() === targetId) {
+          sheet.getRange(i + 1, 4).setValue(newRole);
+          clearStaffCache(targetId);
+          return '✅ เปลี่ยน role ของ ' + values[i][0] + ' เป็น ' + newRole + ' แล้ว';
+        }
+      }
+      return '❌ ไม่พบ User ID นี้ในระบบ';
+    }
+
     // /list
     case '/list': {
       const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
@@ -139,8 +172,9 @@ function handleAdminCommand(query, adminId, event) {
       const lines  = ['👥 รายชื่อผู้ใช้งานทั้งหมด\n'];
       for (let i = 1; i < values.length; i++) {
         if (values[i][0]) {
-          const icon = values[i][3] === 'admin' ? '👑' : '👤';
-          lines.push(icon + ' ' + values[i][0] + ' (' + values[i][3] + ') - ' + values[i][2]);
+          const icon   = values[i][3] === 'admin' ? '👑' : '👤';
+          const status = values[i][2] === 'active' ? '🟢' : '🔴';
+          lines.push(icon + ' ' + values[i][0] + ' (' + values[i][3] + ') ' + status);
         }
       }
       return lines.join('\n');
@@ -149,13 +183,13 @@ function handleAdminCommand(query, adminId, event) {
     // /status <userId>
     case '/status': {
       if (parts.length < 2) return '❌ รูปแบบ:\n/status <userId>';
-      const checkId    = parts[1].trim();
+      const checkId     = parts[1].trim();
       const targetStaff = getStaff(checkId);
-      if (!targetStaff) return '❌ ไม่พบ User ID นี้ในระบบ';
+      if (!targetStaff) return '❌ ไม่พบ User ID นี้ในระบบ หรือ status ไม่ใช่ active';
       return '📋 ' + targetStaff.name + '\nRole: ' + targetStaff.role + '\nStatus: active';
     }
 
-    // /whois → ดูจาก Staff Sheet
+    // /whois
     case '/whois': {
       const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
@@ -172,7 +206,7 @@ function handleAdminCommand(query, adminId, event) {
 
     // /visitors
     case '/visitors': {
-      const sheet    = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visitors');
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visitors');
       if (!sheet) return '❌ ไม่พบ Sheet Visitors';
       const values   = sheet.getDataRange().getValues();
       const dataRows = values.slice(1);
@@ -199,11 +233,11 @@ function handleAdminCommand(query, adminId, event) {
       const lastRows = dataRows.slice(-limit).reverse();
       const lines    = ['📋 Log ' + limit + ' รายการล่าสุด\n'];
       lastRows.forEach(row => {
-        const time   = row[0] ? Utilities.formatDate(new Date(row[0]), 'Asia/Bangkok', 'dd/MM HH:mm') : '-';
-        const name   = row[2] || row[1] || '-';
-        const q      = row[4] || '-';
-        const res    = row[5] || '-';
-        const icon   = res === 'พบข้อมูล' ? '✅' : '❌';
+        const time = row[0] ? Utilities.formatDate(new Date(row[0]), 'Asia/Bangkok', 'dd/MM HH:mm') : '-';
+        const name = row[2] || row[1] || '-';
+        const q    = row[4] || '-';
+        const res  = row[5] || '-';
+        const icon = res === 'พบข้อมูล' ? '✅' : '❌';
         lines.push(icon + ' ' + time + ' | ' + name + '\n    🔍 ' + q);
       });
       return lines.join('\n');
@@ -216,8 +250,9 @@ function handleAdminCommand(query, adminId, event) {
       const keys   = ['vehicles'];
       for (let i = 1; i < values.length; i++) {
         if (values[i][1]) {
-          keys.push('staff_' + values[i][1].toString().trim());
-          keys.push('name_' + values[i][1].toString().trim());
+          keys.push('staff_'   + values[i][1].toString().trim());
+          keys.push('name_'    + values[i][1].toString().trim());
+          keys.push('tracked_' + values[i][1].toString().trim());
         }
       }
       CacheService.getScriptCache().removeAll(keys);
@@ -225,19 +260,23 @@ function handleAdminCommand(query, adminId, event) {
     }
 
     // /help
-    case '/help':
+    case '/help': {
+      const p = groupId ? '#' : '';
       return '📋 คำสั่งที่ใช้ได้\n\n' +
              '👤 ทุกคน\n' +
-             '/myid - ดูข้อมูลของตัวเอง\n\n' +
+             p + '/myid\n\n' +
              '👑 Admin เท่านั้น\n' +
-             '/add <userId> <ชื่อ> <role>\n' +
-             '/remove <userId>\n' +
-             '/list\n' +
-             '/status <userId>\n' +
-             '/whois\n' +
-             '/visitors\n' +
-             '/log <จำนวน>\n' +
-             '/clearcache';
+             p + '/add <userId> <ชื่อ> <role>\n' +
+             p + '/remove <userId>\n' +
+             p + '/setstatus <userId> <active|inactive>\n' +
+             p + '/setrole <userId> <admin|staff>\n' +
+             p + '/list\n' +
+             p + '/status <userId>\n' +
+             p + '/whois\n' +
+             p + '/visitors\n' +
+             p + '/log <จำนวน>\n' +
+             p + '/clearcache';
+    }
 
     default:
       return '❌ ไม่รู้จักคำสั่งนี้\nพิมพ์ /help เพื่อดูคำสั่งทั้งหมด';
@@ -279,9 +318,9 @@ function searchByHouse(query) {
     const house = row[4].toString().trim();
     if (house === q) return true;
     if (house.includes('-') && q.includes('/')) {
-      const [prefix, range]   = house.split('/');
+      const [prefix, range]    = house.split('/');
       const [qPrefix, qNumStr] = q.split('/');
-      const [min, max]        = range.split('-').map(Number);
+      const [min, max]         = range.split('-').map(Number);
       return prefix === qPrefix && Number(qNumStr) >= min && Number(qNumStr) <= max;
     }
     return false;
@@ -341,6 +380,10 @@ function clearStaffCache(userId) {
 // 6. UTILITIES
 // ============================
 function trackUser(userId, displayName) {
+  const cache    = CacheService.getScriptCache();
+  const cacheKey = 'tracked_' + userId;
+  if (cache.get(cacheKey)) return;
+
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visitors');
   if (!sheet) return;
   const data  = sheet.getDataRange().getValues();
@@ -350,6 +393,8 @@ function trackUser(userId, displayName) {
   } else {
     sheet.appendRow([userId, displayName, new Date()]);
   }
+
+  cache.put(cacheKey, '1', 3600); // 1 ชั่วโมง
 }
 
 function writeLog(uid, sName, lName, q, res) {
@@ -358,23 +403,25 @@ function writeLog(uid, sName, lName, q, res) {
 }
 
 function getLineDisplayName(userId) {
-  if (!userId) return "Unknown";
-  try {
-    const url = 'https://api.line.me/v2/bot/profile/' + userId;
-    const res = UrlFetchApp.fetch(url, {
-      headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN },
-      muteHttpExceptions: true // 🔥 หัวใจสำคัญ: กัน Script พังถ้าติด Error 403/404
-    });
+  if (!userId) return 'Unknown';
 
-    const status = res.getResponseCode();
-    if (status === 200) {
-      return JSON.parse(res.getContentText()).displayName;
+  const cache  = CacheService.getScriptCache();
+  const cached = cache.get('name_' + userId);
+  if (cached) return cached;
+
+  try {
+    const res    = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + userId, {
+      headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN },
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() === 200) {
+      const name = JSON.parse(res.getContentText()).displayName;
+      cache.put('name_' + userId, name, CACHE_TIME);
+      return name;
     }
-    
-    // ถ้าดึงไม่ได้ (สายฟรี หรือไม่ได้แอดเพื่อน) ให้แสดง UID 4 ตัวท้ายเพื่อให้ Admin พอรู้ว่าเป็นใคร
-    return "User-" + userId.substring(userId.length - 4); 
-  } catch (e) { 
-    return "Unknown"; 
+    return 'User-' + userId.substring(userId.length - 4);
+  } catch(e) {
+    return 'Unknown';
   }
 }
 
@@ -410,8 +457,8 @@ function pushToLine(userId, message) {
 
 function getStatusLabel(status) {
   const s = (status || '').toString().toLowerCase();
-  if (s === 'active')   return '✅ สถานะ: อนุญาต';
-  if (s === 'inactive') return '⛔ สถานะ: ไม่อนุญาต';
+  if (s === 'active')    return '✅ สถานะ: อนุญาต';
+  if (s === 'inactive')  return '⛔ สถานะ: ไม่อนุญาต';
   if (s === 'blacklist') return '🚨 สถานะ: Blacklist';
   return '❓ สถานะ: ไม่ระบุ';
 }
@@ -447,7 +494,7 @@ function onEdit(e) {
   const cache     = CacheService.getScriptCache();
 
   if (sheetName === 'Staff') {
-    const row    = range.getRow();
+    const row = range.getRow();
     if (row <= 1) return;
     const userId = sheet.getRange(row, 2).getValue();
     if (userId) {
