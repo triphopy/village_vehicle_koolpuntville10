@@ -501,8 +501,9 @@ function onEdit(e) {
     if (row <= 1) return;
     const userId = sheet.getRange(row, 2).getValue();
     if (userId) {
-      cache.remove('staff_' + userId);
-      cache.remove('staff_list');
+      cache.remove('staff_' + userId); // cache รายคน
+      cache.remove('staff_list');       // cache รายชื่อ
+      cache.remove('staff');            // ✅ เพิ่ม: cache Sheet ทั้งหมด
       console.log('Auto-cleared cache for Staff ID: ' + userId);
     }
   }
