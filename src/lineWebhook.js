@@ -439,61 +439,22 @@ function trackUser(userId, displayName) {
 // ============================
 
 function deleteOldLogs() {
-  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
-  var data   = sheet.getDataRange().getValues();
-  var cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - LOG_RETENTION_DAYS);
-  
-  var toKeep = [data[0]]; // เก็บ header ไว้เสมอ
-
-  for (var i = 1; i < data.length; i++) {
-    var logDate = new Date(data[i][0]); // คอลัมน์แรก = timestamp
-    if (logDate >= cutoff) {
-      toKeep.push(data[i]);
-    }
-  }
-
-  var deleted = data.length - toKeep.length;
-
-  // เขียนกลับ Sheet
-  sheet.clearContents();
-  sheet.getRange(1, 1, toKeep.length, toKeep[0].length)
-       .setValues(toKeep);
-
-  Logger.log('LOG_RETENTION_DAYS: ' + LOG_RETENTION_DAYS);
-  Logger.log('Deleted: ' + deleted + ' rows | Remaining: ' + (toKeep.length - 1) + ' rows');
-}
-
-// ============================
-// Auto Delete Visitors (ลบคนเข้าชมที่เก่านานเกินไป)
-// ============================
-function deleteOldVisitors() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visitors');
-  if (!sheet) {
-    console.error('ไม่พบ Sheet ชื่อ Visitors');
-    return;
-  }
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
+  if (!sheet) return;
   
   var data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return; // มีแต่ Header ไม่ต้องทำอะไร
+  if (data.length <= 1) return; // มีแต่ Header
 
   var cutoff = new Date();
-  // ใช้ค่า LOG_RETENTION_DAYS เดียวกัน หรือจะเปลี่ยนเป็นตัวเลขอื่นก็ได้
-  var retentionDays = Number(PropertiesService.getScriptProperties().getProperty('LOG_RETENTION_DAYS')) || 30; 
-  
-  cutoff.setDate(cutoff.getDate() - retentionDays);
-  cutoff.setHours(0, 0, 0, 0); // ตั้งเป็นเวลา 00:00 ของวันที่กำหนด
+  cutoff.setDate(cutoff.getDate() - LOG_RETENTION_DAYS);
+  cutoff.setHours(0, 0, 0, 0); // ตั้งเป็นเวลา 00:00 ของวันที่ต้องลบ
 
-  var toKeep = [data[0]]; // เก็บ Header ไว้
+  var toKeep = [data[0]]; // Header
 
   for (var i = 1; i < data.length; i++) {
-    // *** สำคัญ: ใน Visitors วันที่อยู่ที่คอลัมน์ที่ 3 (Index 2) ***
-    var lastSeen = new Date(data[i][2]); 
-    
-    if (lastSeen instanceof Date && !isNaN(lastSeen)) {
-      if (lastSeen >= cutoff) {
-        toKeep.push(data[i]);
-      }
+    var logDate = new Date(data[i][0]);
+    if (logDate >= cutoff) {
+      toKeep.push(data[i]);
     }
   }
 
@@ -503,7 +464,7 @@ function deleteOldVisitors() {
     sheet.getRange(1, 1, toKeep.length, toKeep[0].length).setValues(toKeep);
   }
 
-  console.log('Visitors Cleanup: Deleted ' + deleted + ' rows.');
+  console.log('Log Cleanup: Deleted ' + deleted + ' rows.');
 }
 
 function testDoPost() {
