@@ -364,19 +364,26 @@ function writeLog(uid, sName, lName, q, res) {
   sheet.appendRow([new Date(), uid, sName, lName, q, res]);
 }
 
-function getLineDisplayName(userId) {
-  const cache  = CacheService.getScriptCache();
-  const cached = cache.get('name_' + userId);
-  if (cached) return cached;
+function getLineDisplayName(userId, groupId) {
   try {
-    const res  = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + userId, {
-      headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN }
+    // ถ้ามี groupId (มาจากกลุ่ม) ให้ใช้ Endpoint สำหรับสมาชิกกลุ่ม
+    let url = 'https://api.line.me/v2/bot/profile/' + userId;
+    if (groupId) {
+      url = `https://api.line.me/v2/bot/group/${groupId}/member/${userId}`;
+    }
+
+    const res = UrlFetchApp.fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN },
+      muteHttpExceptions: true // กันพังถ้าดึงชื่อไม่ได้
     });
-    const name = JSON.parse(res.getContentText()).displayName;
-    cache.put('name_' + userId, name, CACHE_TIME);
-    return name;
-  } catch(e) {
-    return userId;
+    
+    const status = res.getResponseCode();
+    if (status === 200) {
+      return JSON.parse(res.getContentText()).displayName;
+    }
+    return "Unknown User"; // ถ้าดึงไม่ได้จริงๆ ให้ส่งค่านี้กลับแทนที่จะพัง
+  } catch (e) { 
+    return "Unknown User"; 
   }
 }
 
