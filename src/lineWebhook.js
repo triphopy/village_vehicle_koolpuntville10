@@ -4,7 +4,7 @@
 var props = PropertiesService.getScriptProperties();
 var LINE_ACCESS_TOKEN   = props.getProperty('LINE_ACCESS_TOKEN');
 var LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
-var LOG_RETENTION_DAYS = props.getProperty('LOG_RETENTION_DAYS');
+var LOG_RETENTION_DAYS = props.getProperty('LOG_RETENTION_DAYS') || 30;
 
 // ============================
 // รับข้อความจาก LINE
@@ -482,10 +482,7 @@ function deleteOldVisitors() {
   if (data.length <= 1) return; // มีแต่ Header ไม่ต้องทำอะไร
 
   var cutoff = new Date();
-  // ใช้ค่า LOG_RETENTION_DAYS เดียวกัน หรือจะเปลี่ยนเป็นตัวเลขอื่นก็ได้
-  var retentionDays = Number(PropertiesService.getScriptProperties().getProperty('LOG_RETENTION_DAYS')) || 30; 
-  
-  cutoff.setDate(cutoff.getDate() - retentionDays);
+  cutoff.setDate(cutoff.getDate() - LOG_RETENTION_DAYS);
   cutoff.setHours(0, 0, 0, 0); // ตั้งเป็นเวลา 00:00 ของวันที่กำหนด
 
   var toKeep = [data[0]]; // เก็บ Header ไว้
