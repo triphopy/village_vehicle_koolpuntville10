@@ -17,6 +17,7 @@ function doPost(e) {
 
     data.events.forEach(event => {
       const userId     = event.source.userId;
+      const groupId = event.source.groupId; // ดึง groupId มาด้วย (ถ้ามี)
       const replyToken = event.replyToken;
       const isGroup    = !!event.source.groupId;
 
@@ -42,7 +43,7 @@ function doPost(e) {
       }
 
       // Track ผู้ใช้
-      const lineName = getLineDisplayName(userId);
+      const lineName = getLineDisplayName(userId, groupId);
       trackUser(userId, lineName);
 
       // /myid → ทุกคนใช้ได้
