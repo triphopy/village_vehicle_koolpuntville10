@@ -376,7 +376,10 @@ function getStaff(userId) {
 }
 
 function clearStaffCache(userId) {
-  CacheService.getScriptCache().remove('staff_' + userId);
+  const cache = CacheService.getScriptCache();
+  cache.remove('staff_' + userId); // cache รายคน
+  cache.remove('staff');            // ✅ เพิ่ม: cache Sheet ทั้งหมด
+  cache.remove('staff_list');       // cache รายชื่อ
 }
 
 // ============================
