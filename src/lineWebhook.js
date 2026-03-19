@@ -467,6 +467,49 @@ function deleteOldLogs() {
   console.log('Log Cleanup: Deleted ' + deleted + ' rows.');
 }
 
+
+// ============================
+// Auto Delete Visitors (ลบคนเข้าชมที่เก่านานเกินไป)
+// ============================
+function deleteOldVisitors() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visitors');
+  if (!sheet) {
+    console.error('ไม่พบ Sheet ชื่อ Visitors');
+    return;
+  }
+  
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return; // มีแต่ Header ไม่ต้องทำอะไร
+
+  var cutoff = new Date();
+  // ใช้ค่า LOG_RETENTION_DAYS เดียวกัน หรือจะเปลี่ยนเป็นตัวเลขอื่นก็ได้
+  var retentionDays = Number(PropertiesService.getScriptProperties().getProperty('LOG_RETENTION_DAYS')) || 30; 
+  
+  cutoff.setDate(cutoff.getDate() - retentionDays);
+  cutoff.setHours(0, 0, 0, 0); // ตั้งเป็นเวลา 00:00 ของวันที่กำหนด
+
+  var toKeep = [data[0]]; // เก็บ Header ไว้
+
+  for (var i = 1; i < data.length; i++) {
+    // *** สำคัญ: ใน Visitors วันที่อยู่ที่คอลัมน์ที่ 3 (Index 2) ***
+    var lastSeen = new Date(data[i][2]); 
+    
+    if (lastSeen instanceof Date && !isNaN(lastSeen)) {
+      if (lastSeen >= cutoff) {
+        toKeep.push(data[i]);
+      }
+    }
+  }
+
+  var deleted = data.length - toKeep.length;
+  if (deleted > 0) {
+    sheet.clearContents();
+    sheet.getRange(1, 1, toKeep.length, toKeep[0].length).setValues(toKeep);
+  }
+
+  console.log('Visitors Cleanup: Deleted ' + deleted + ' rows.');
+}
+
 function testDoPost() {
   // จำลองข้อมูลที่ LINE จะส่งมา
   var mockEvent = {
