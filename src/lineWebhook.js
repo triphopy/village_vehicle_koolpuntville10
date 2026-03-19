@@ -439,29 +439,32 @@ function trackUser(userId, displayName) {
 // ============================
 
 function deleteOldLogs() {
-  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
-  var data   = sheet.getDataRange().getValues();
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
+  if (!sheet) return;
+  
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return; // มีแต่ Header
+
   var cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - LOG_RETENTION_DAYS);
-  
-  var toKeep = [data[0]]; // เก็บ header ไว้เสมอ
+  cutoff.setHours(0, 0, 0, 0); // ตั้งเป็นเวลา 00:00 ของวันที่ต้องลบ
+
+  var toKeep = [data[0]]; // Header
 
   for (var i = 1; i < data.length; i++) {
-    var logDate = new Date(data[i][0]); // คอลัมน์แรก = timestamp
+    var logDate = new Date(data[i][0]);
     if (logDate >= cutoff) {
       toKeep.push(data[i]);
     }
   }
 
   var deleted = data.length - toKeep.length;
+  if (deleted > 0) {
+    sheet.clearContents();
+    sheet.getRange(1, 1, toKeep.length, toKeep[0].length).setValues(toKeep);
+  }
 
-  // เขียนกลับ Sheet
-  sheet.clearContents();
-  sheet.getRange(1, 1, toKeep.length, toKeep[0].length)
-       .setValues(toKeep);
-
-  Logger.log('LOG_RETENTION_DAYS: ' + LOG_RETENTION_DAYS);
-  Logger.log('Deleted: ' + deleted + ' rows | Remaining: ' + (toKeep.length - 1) + ' rows');
+  console.log('Log Cleanup: Deleted ' + deleted + ' rows.');
 }
 
 function testDoPost() {
