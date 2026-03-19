@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - 'feature/**'   # ← เพิ่ม: trigger บน feature branch ด้วย
+      - 'feature/**'
 
 jobs:
   deploy:
@@ -29,22 +29,32 @@ jobs:
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             SCRIPT_ID="${{ secrets.SCRIPT_ID_BLUE }}"
+            DEPLOYMENT_ID="${{ secrets.DEPLOYMENT_ID_BLUE }}"
             ENV_LABEL="🔵 BLUE (Production)"
           else
             SCRIPT_ID="${{ secrets.SCRIPT_ID_GREEN }}"
+            DEPLOYMENT_ID="${{ secrets.DEPLOYMENT_ID_GREEN }}"
             ENV_LABEL="🟢 GREEN (Staging)"
           fi
 
           echo "Deploying to $ENV_LABEL"
           echo "ScriptId: $SCRIPT_ID"
+          echo "DeploymentId: $DEPLOYMENT_ID"
 
           echo '{
             "scriptId": "'"$SCRIPT_ID"'",
             "rootDir": "./src"
           }' > .clasp.json
 
+          # เก็บ DEPLOYMENT_ID ไว้ใช้ใน step ถัดไป
+          echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> $GITHUB_ENV
+          echo "ENV_LABEL=$ENV_LABEL" >> $GITHUB_ENV
+
       - name: Push to Apps Script
         run: clasp push --force
 
       - name: Deploy new version
-        run: clasp deploy --description "${{ github.event.head_commit.message }}"
+        run: clasp deploy --deploymentId $DEPLOYMENT_ID --description "${{ github.event.head_commit.message }}"
+
+      - name: Summary
+        run: echo "✅ Deployed to $ENV_LABEL successfully"

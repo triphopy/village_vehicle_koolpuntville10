@@ -265,21 +265,20 @@ function handleAdminCommand(query, adminId, event) {
 
     // /help
     case '/help': {
-      const p = groupId ? '#' : '';
       return '📋 คำสั่งที่ใช้ได้\n\n' +
-             '👤 ทุกคน\n' +
-             p + '/myid\n\n' +
-             '👑 Admin เท่านั้น\n' +
-             p + '/add <userId> <ชื่อ> <role>\n' +
-             p + '/remove <userId>\n' +
-             p + '/setstatus <userId> <active|inactive>\n' +
-             p + '/setrole <userId> <admin|staff>\n' +
-             p + '/list\n' +
-             p + '/status <userId>\n' +
-             p + '/whois\n' +
-             p + '/visitors\n' +
-             p + '/log <จำนวน>\n' +
-             p + '/clearcache';
+            '👤 ทุกคน\n' +
+            '/myid\n\n' +
+            '👑 Admin เท่านั้น\n' +
+            '/add <userId> <ชื่อ> <role>\n' +
+            '/remove <userId>\n' +
+            '/setstatus <userId> <active|inactive>\n' +
+            '/setrole <userId> <admin|staff>\n' +
+            '/list\n' +
+            '/status <userId>\n' +
+            '/whois\n' +
+            '/visitors\n' +
+            '/log <จำนวน>\n' +
+            '/clearcache';
     }
 
     default:
