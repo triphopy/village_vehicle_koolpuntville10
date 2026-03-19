@@ -4,6 +4,7 @@
 var props = PropertiesService.getScriptProperties();
 var LINE_ACCESS_TOKEN   = props.getProperty('LINE_ACCESS_TOKEN');
 var LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
+var LOG_RETENTION_DAYS = props.getProperty('LOG_RETENTION_DAYS');
 
 // ============================
 // รับข้อความจาก LINE
@@ -27,8 +28,15 @@ function doPost(e) {
     if (!event || event.type !== 'message' || event.message.type !== 'text') return;
 
     var userId     = event.source.userId;
+    var isGroup    = !!event.source.groupId;
     var replyToken = event.replyToken;
     var query      = event.message.text.trim();
+
+    // Track UID อัตโนมัติ
+    if (userId) {
+      var displayName = getLineDisplayName(userId);
+      trackUser(userId, displayName);
+    }
 
     // ตรวจสอบสิทธิ์
     var staff = getStaff(userId);
@@ -150,6 +158,30 @@ function handleAdminCommand(query, adminId) {
     return '✅ ล้าง Cache สำเร็จ ' + keys.length + ' รายการ';
   }
 
+  // /visitors
+  if (cmd === '/visitors') {
+    var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visitors');
+    if (!sheet) return '❌ ไม่พบ Sheet Visitors';
+
+    var values   = sheet.getDataRange().getValues();
+    var dataRows = values.slice(1);
+    if (dataRows.length === 0) return '📋 ยังไม่มีข้อมูล';
+
+    var lines = ['👥 คนที่เคยพิมพ์ในระบบ ' + dataRows.length + ' คน\n'];
+
+    dataRows.forEach(function(row) {
+      var uid      = row[0] || '-';
+      var name     = row[1] || '-';
+      var lastSeen = row[2] ? Utilities.formatDate(new Date(row[2]), 'Asia/Bangkok', 'dd/MM HH:mm') : '-';
+      var staff    = getStaff(uid);
+      var icon     = staff ? '✅' : '❓';
+
+      lines.push(icon + ' ' + name + '\n    ' + uid + '\n    last: ' + lastSeen);
+    });
+
+    return lines.join('\n');
+  }
+
   // /help
   if (cmd === '/help') {
     return '📋 คำสั่งที่ใช้ได้\n\n' +
@@ -157,6 +189,7 @@ function handleAdminCommand(query, adminId) {
            '/remove <userId>\n' +
            '/list\n' +
            '/status <userId>\n' +
+           '/visitors\n' +
            '/clearcache';
   }
 
@@ -380,4 +413,72 @@ function getStatusMessage(status) {
     case 'blacklist': return '🚨 สถานะ: Blacklist';
     default:          return '❓ สถานะ: ไม่ระบุ';
   }
+}
+
+function trackUser(userId, displayName) {
+  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visitors');
+  if (!sheet) return;
+
+  var values = sheet.getDataRange().getValues();
+
+  // เช็คว่ามีอยู่แล้วไหม
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0].toString().trim() === userId) {
+      // อัปเดต lastSeen
+      sheet.getRange(i + 1, 3).setValue(new Date());
+      return;
+    }
+  }
+
+  // ถ้ายังไม่มี → เพิ่มใหม่
+  sheet.appendRow([userId, displayName, new Date()]);
+}
+
+// ============================
+// Auto Delete Log
+// ============================
+
+function deleteOldLogs() {
+  var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
+  var data   = sheet.getDataRange().getValues();
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - LOG_RETENTION_DAYS);
+  
+  var toKeep = [data[0]]; // เก็บ header ไว้เสมอ
+
+  for (var i = 1; i < data.length; i++) {
+    var logDate = new Date(data[i][0]); // คอลัมน์แรก = timestamp
+    if (logDate >= cutoff) {
+      toKeep.push(data[i]);
+    }
+  }
+
+  var deleted = data.length - toKeep.length;
+
+  // เขียนกลับ Sheet
+  sheet.clearContents();
+  sheet.getRange(1, 1, toKeep.length, toKeep[0].length)
+       .setValues(toKeep);
+
+  Logger.log('LOG_RETENTION_DAYS: ' + LOG_RETENTION_DAYS);
+  Logger.log('Deleted: ' + deleted + ' rows | Remaining: ' + (toKeep.length - 1) + ' rows');
+}
+
+function testDoPost() {
+  // จำลองข้อมูลที่ LINE จะส่งมา
+  var mockEvent = {
+    postData: {
+      contents: JSON.stringify({
+        events: [{
+          replyToken: "test_token",
+          type: "message",
+          source: { userId: "ใส่_USER_ID_จริงของคุณตรงนี้", type: "user" },
+          message: { type: "text", text: "กข 1234" } // ลองใส่ทะเบียนรถที่อยู่ใน Sheet
+        }]
+      })
+    }
+  };
+  
+  // เรียกใช้ doPost โดยส่งค่าจำลองเข้าไป
+  doPost(mockEvent);
 }
