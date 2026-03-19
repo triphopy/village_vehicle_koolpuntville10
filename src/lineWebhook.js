@@ -17,7 +17,6 @@ function doPost(e) {
 
     data.events.forEach(event => {
       const userId     = event.source.userId;
-      const groupId = event.source.groupId; // ดึง groupId มาด้วย (ถ้ามี)
       const replyToken = event.replyToken;
       const isGroup    = !!event.source.groupId;
 
@@ -36,14 +35,8 @@ function doPost(e) {
 
       let query = event.message.text.trim();
 
-      // ในกลุ่ม ต้องพิมพ์ # นำหน้า
-      if (isGroup) {
-        if (!query.startsWith('#')) return;
-        query = query.substring(1).trim();
-      }
-
       // Track ผู้ใช้
-      const lineName = getLineDisplayName(userId, groupId);
+      const lineName = userId ? getLineDisplayName(userId) : "Someone in Group";
       trackUser(userId, lineName);
 
       // /myid → ทุกคนใช้ได้
@@ -364,26 +357,24 @@ function writeLog(uid, sName, lName, q, res) {
   sheet.appendRow([new Date(), uid, sName, lName, q, res]);
 }
 
-function getLineDisplayName(userId, groupId) {
+function getLineDisplayName(userId) {
+  if (!userId) return "Unknown";
   try {
-    // ถ้ามี groupId (มาจากกลุ่ม) ให้ใช้ Endpoint สำหรับสมาชิกกลุ่ม
-    let url = 'https://api.line.me/v2/bot/profile/' + userId;
-    if (groupId) {
-      url = `https://api.line.me/v2/bot/group/${groupId}/member/${userId}`;
-    }
-
+    const url = 'https://api.line.me/v2/bot/profile/' + userId;
     const res = UrlFetchApp.fetch(url, {
       headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN },
-      muteHttpExceptions: true // กันพังถ้าดึงชื่อไม่ได้
+      muteHttpExceptions: true // 🔥 หัวใจสำคัญ: กัน Script พังถ้าติด Error 403/404
     });
-    
+
     const status = res.getResponseCode();
     if (status === 200) {
       return JSON.parse(res.getContentText()).displayName;
     }
-    return "Unknown User"; // ถ้าดึงไม่ได้จริงๆ ให้ส่งค่านี้กลับแทนที่จะพัง
+    
+    // ถ้าดึงไม่ได้ (สายฟรี หรือไม่ได้แอดเพื่อน) ให้แสดง UID 4 ตัวท้ายเพื่อให้ Admin พอรู้ว่าเป็นใคร
+    return "User-" + userId.substring(userId.length - 4); 
   } catch (e) { 
-    return "Unknown User"; 
+    return "Unknown"; 
   }
 }
 
