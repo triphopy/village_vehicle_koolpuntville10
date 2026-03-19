@@ -10,6 +10,7 @@ const LINE_ACCESS_TOKEN   = props.getProperty('LINE_ACCESS_TOKEN');
 const LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
 const RETENTION_DAYS      = Number(props.getProperty('LOG_RETENTION_DAYS')) || 30;
 const CACHE_TIME          = 3600;
+const BACKUP_FOLDER_NAME  = props.getProperty('BACKUP_FOLDER_NAME');
 
 // ดึง Allowed Group IDs จาก Properties
 const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
@@ -510,6 +511,45 @@ function dailyCleanup() {
       sheet.getRange(1, 1, toKeep.length, toKeep[0].length).setValues(toKeep);
     }
   });
+}
+
+// Backup Functions
+function getOrCreateBackupFolder() {
+  const folders = DriveApp.getFoldersByName(BACKUP_FOLDER_NAME);
+  return folders.hasNext()
+    ? folders.next()
+    : DriveApp.createFolder(BACKUP_FOLDER_NAME);
+}
+
+function dailyBackup() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const folder = getOrCreateBackupFolder();
+  const date = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd');
+
+  DriveApp.getFileById(ss.getId()).makeCopy(`Backup_${date}`, folder);
+  console.log('Backup สำเร็จ: ' + date);
+}
+
+function cleanOldBackups() {
+  const folder = getOrCreateBackupFolder(); // ← เปลี่ยนจาก getFolderById('FOLDER_ID')
+  const files = folder.getFiles();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - RETENTION_DAYS); // ← ใช้ตัวแปรที่มีอยู่แล้ว
+
+  while (files.hasNext()) {
+    const file = files.next();
+    if (file.getDateCreated() < cutoff) {
+      file.setTrashed(true);
+    }
+  }
+  console.log('✅ ลบ Backup เก่าเกิน ' + RETENTION_DAYS + ' วันแล้ว');
+}
+
+function dailyMaintenance() {
+  dailyBackup();      // สำรองข้อมูล
+  cleanOldBackups();  // ลบ Backup เก่า
+  dailyCleanup();     // ล้าง Log เก่า
+  console.log('✅ Daily Maintenance เสร็จสิ้น: ' + new Date());
 }
 
 function onEdit(e) {
