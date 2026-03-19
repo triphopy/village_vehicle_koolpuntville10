@@ -55,6 +55,27 @@ function doPost(e) {
         return replyToLine(replyToken, lines.join('\n'));
       }
 
+      // /help → ทุกคนใช้ได้ แต่แสดงตาม role
+      if (query === '/help') {
+        const staffInfo = getStaff(userId);
+        const role      = staffInfo ? staffInfo.role : null;
+        let msg         = '📋 คำสั่งที่ใช้ได้\n\n👤 ทุกคน\n/myid\n/help';
+        if (role === 'admin') {
+          msg += '\n\n👑 Admin เท่านั้น\n' +
+                '/add <userId> <ชื่อ> <role>\n' +
+                '/remove <userId>\n' +
+                '/setstatus <userId> <active|inactive>\n' +
+                '/setrole <userId> <admin|staff>\n' +
+                '/list\n' +
+                '/status <userId>\n' +
+                '/whois\n' +
+                '/visitors\n' +
+                '/log <จำนวน>\n' +
+                '/clearcache';
+        }
+        return replyToLine(replyToken, msg);
+      }
+
       // ตรวจสอบสิทธิ์
       const staff = getStaff(userId);
       if (!staff) {
@@ -261,24 +282,6 @@ function handleAdminCommand(query, adminId, event) {
       }
       CacheService.getScriptCache().removeAll(keys);
       return '✅ ล้าง Cache สำเร็จ ' + keys.length + ' รายการ';
-    }
-
-    // /help
-    case '/help': {
-      return '📋 คำสั่งที่ใช้ได้\n\n' +
-            '👤 ทุกคน\n' +
-            '/myid\n\n' +
-            '👑 Admin เท่านั้น\n' +
-            '/add <userId> <ชื่อ> <role>\n' +
-            '/remove <userId>\n' +
-            '/setstatus <userId> <active|inactive>\n' +
-            '/setrole <userId> <admin|staff>\n' +
-            '/list\n' +
-            '/status <userId>\n' +
-            '/whois\n' +
-            '/visitors\n' +
-            '/log <จำนวน>\n' +
-            '/clearcache';
     }
 
     default:
