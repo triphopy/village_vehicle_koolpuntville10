@@ -217,8 +217,8 @@ function replyToLine(token, msg) {
 
 function getStatusLabel(status) {
   const s = status.toString().toLowerCase();
-  if (s === 'active') return '✅ อนุญาต';
-  if (s === 'inactive') return '🚨 ไม่อนุญาต';
+  if (s === 'active') return '✅ สถานะ: อนุญาต';
+  if (s === 'inactive') return '🚨 สถานะ: ไม่อนุญาต';
   return '⛔ ระงับสิทธิ์';
 }
 
