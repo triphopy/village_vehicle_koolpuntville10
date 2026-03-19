@@ -242,3 +242,40 @@ function dailyCleanup() {
     }
   });
 }
+
+/**
+ * ฟังก์ชันพิเศษ: ทำงานอัตโนมัติเมื่อมีการแก้ไขข้อมูลใน Sheet
+ * เพื่อล้าง Cache ทันทีที่มีการเปลี่ยน Status หรือ Role ของ Staff
+ */
+function onEdit(e) {
+  const range = e.range;
+  const sheet = range.getSheet();
+  const sheetName = sheet.getName();
+  const cache = CacheService.getScriptCache();
+  
+  // 1. กรณีแก้ไขข้อมูลในหน้า Staff
+  if (sheetName === "Staff") {
+    const row = range.getRow();
+    if (row <= 1) return; // ข้าม Header
+
+    // ดึงข้อมูล Line User ID จากคอลัมน์ที่ 2 (B) 
+    // และดึงข้อมูล Status จากคอลัมน์ที่ 3 (C) เพื่อความชัวร์
+    const userId = sheet.getRange(row, 2).getValue();
+    
+    if (userId) {
+      // ลบ Cache รายบุคคล (staff_...)
+      cache.remove("staff_" + userId);
+      
+      // ลบ Cache รายชื่อพนักงานทั้งหมด (ถ้ามี)
+      cache.remove("staff_list");
+      
+      console.log("Auto-cleared cache for Staff ID: " + userId);
+    }
+  }
+
+  // 2. กรณีแก้ไขข้อมูลในหน้า Vehicles (แถมให้)
+  if (sheetName === "Vehicles") {
+    cache.remove("vehicles");
+    console.log("Auto-cleared vehicle cache due to manual edit");
+  }
+}
