@@ -13,6 +13,7 @@ const BACKUPRETENTION_DAYS      = Number(props.getProperty('BACKUP_RETENTION_DAY
 
 const CACHE_TIME          = 3600;
 const BACKUP_FOLDER_NAME  = props.getProperty('BACKUP_FOLDER_NAME');
+const SPREADSHEET_ID = props.getProperty('SPREADSHEET_ID');
 
 // ดึง Allowed Group IDs จาก Properties
 const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
@@ -146,7 +147,7 @@ function handleAdminCommand(query, adminId, event) {
       const newName = parts[2].trim();
       const newRole = parts[3].trim().toLowerCase();
       if (newRole !== 'admin' && newRole !== 'staff') return '❌ role ต้องเป็น admin หรือ staff เท่านั้น';
-      const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+      const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       for (let i = 1; i < values.length; i++) {
         if (values[i][1].toString().trim() === newId) return '⚠️ User ID นี้มีในระบบแล้ว';
@@ -160,7 +161,7 @@ function handleAdminCommand(query, adminId, event) {
     case '/remove': {
       if (parts.length < 2) return '❌ รูปแบบ:\n/remove <userId>';
       const removeId = parts[1].trim();
-      const sheet    = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+      const sheet    = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values   = sheet.getDataRange().getValues();
       for (let i = 1; i < values.length; i++) {
         if (values[i][1].toString().trim() === removeId) {
@@ -179,7 +180,7 @@ function handleAdminCommand(query, adminId, event) {
       const targetId  = parts[1].trim();
       const newStatus = parts[2].trim().toLowerCase();
       if (newStatus !== 'active' && newStatus !== 'inactive') return '❌ status ต้องเป็น active หรือ inactive';
-      const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+      const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       for (let i = 1; i < values.length; i++) {
         if (values[i][1].toString().trim() === targetId) {
@@ -197,7 +198,7 @@ function handleAdminCommand(query, adminId, event) {
       const targetId = parts[1].trim();
       const newRole  = parts[2].trim().toLowerCase();
       if (newRole !== 'admin' && newRole !== 'staff') return '❌ role ต้องเป็น admin หรือ staff เท่านั้น';
-      const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+      const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       for (let i = 1; i < values.length; i++) {
         if (values[i][1].toString().trim() === targetId) {
@@ -211,7 +212,7 @@ function handleAdminCommand(query, adminId, event) {
 
     // /list
     case '/list': {
-      const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+      const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       const lines  = ['👥 รายชื่อผู้ใช้งานทั้งหมด\n'];
       for (let i = 1; i < values.length; i++) {
@@ -235,7 +236,7 @@ function handleAdminCommand(query, adminId, event) {
 
     // /whois
     case '/whois': {
-      const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+      const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       const lines  = ['👥 รายชื่อที่มีสิทธิ์ในระบบ\n'];
       for (let i = 1; i < values.length; i++) {
@@ -250,7 +251,7 @@ function handleAdminCommand(query, adminId, event) {
 
     // /visitors
     case '/visitors': {
-      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visitors');
+      const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Visitors');
       if (!sheet) return '❌ ไม่พบ Sheet Visitors';
       const values   = sheet.getDataRange().getValues();
       const dataRows = values.slice(1);
@@ -270,7 +271,7 @@ function handleAdminCommand(query, adminId, event) {
     // /log <จำนวน>
     case '/log': {
       const limit    = Math.min(parts[1] ? parseInt(parts[1]) : 5, 20);
-      const sheet    = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
+      const sheet    = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Log');
       const values   = sheet.getDataRange().getValues();
       const dataRows = values.slice(1);
       if (dataRows.length === 0) return '📋 ยังไม่มี Log ในระบบ';
@@ -289,7 +290,7 @@ function handleAdminCommand(query, adminId, event) {
 
     // /clearcache
     case '/clearcache': {
-      const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Staff');
+      const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       const keys   = ['vehicles'];
       for (let i = 1; i < values.length; i++) {
@@ -370,7 +371,7 @@ function getCachedSheetData(sheetName) {
   const cached = cache.get(sheetName.toLowerCase());
   if (cached) return JSON.parse(cached);
 
-  const values = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName).getDataRange().getValues();
+  const values = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(sheetName).getDataRange().getValues();
   cache.put(sheetName.toLowerCase(), JSON.stringify(values), 600);
   return values;
 }
@@ -412,7 +413,7 @@ function trackUser(userId, displayName) {
   const cacheKey = 'tracked_' + userId;
   if (cache.get(cacheKey)) return;
 
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visitors');
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Visitors');
   if (!sheet) return;
   const data  = sheet.getDataRange().getValues();
   const index = data.findIndex(row => row[0] === userId);
@@ -426,7 +427,7 @@ function trackUser(userId, displayName) {
 }
 
 function writeLog(uid, sName, lName, q, res) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Log');
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Log');
   sheet.appendRow([new Date(), uid, sName, lName, q, res]);
 }
 
@@ -499,7 +500,7 @@ function keepAlive() {
 }
 
 function dailyCleanup() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   ['Log', 'Visitors'].forEach(name => {
     const sheet = ss.getSheetByName(name);
     if (!sheet) return;
@@ -524,7 +525,7 @@ function getOrCreateBackupFolder() {
 }
 
 function dailyBackup() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const folder = getOrCreateBackupFolder();
   const date = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd');
 
