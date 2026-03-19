@@ -11,6 +11,12 @@ const LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
 const RETENTION_DAYS      = Number(props.getProperty('LOG_RETENTION_DAYS')) || 30;
 const CACHE_TIME          = 3600;
 
+// ดึง Allowed Group IDs จาก Properties
+const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
+  .split(',')
+  .map(id => id.trim())
+  .filter(id => id);
+
 // ============================
 // 2. MAIN ENTRY POINT
 // ============================
@@ -22,6 +28,7 @@ function doPost(e) {
     data.events.forEach(event => {
       const userId     = event.source.userId;
       const replyToken = event.replyToken;
+      const groupId    = event.source.groupId || null;
 
       if (!userId) return;
 
@@ -38,53 +45,62 @@ function doPost(e) {
 
       const query    = event.message.text.trim();
       const lineName = getLineDisplayName(userId);
-      trackUser(userId, lineName);
+      const staff    = getStaff(userId);
+      const isAdmin  = staff && staff.role === 'admin';
 
       // /myid → ทุกคนใช้ได้
       if (query === '/myid') {
-        const staffInfo = getStaff(userId);
-        const lines     = ['📋 ข้อมูลของคุณ\n'];
+        const lines = ['📋 ข้อมูลของคุณ\n'];
         lines.push('👤 User ID: ' + userId);
-        if (staffInfo) {
-          lines.push('📝 ชื่อ: '  + staffInfo.name);
-          lines.push('🔑 Role: '  + staffInfo.role);
+        if (staff) {
+          lines.push('📝 ชื่อ: '  + staff.name);
+          lines.push('🔑 Role: '  + staff.role);
           lines.push('🟢 Status: active');
         } else {
           lines.push('⚠️ ยังไม่มีสิทธิ์ในระบบ');
         }
+        if (groupId) lines.push('💬 Group ID: ' + groupId);
         return replyToLine(replyToken, lines.join('\n'));
       }
 
       // /help → ทุกคนใช้ได้ แต่แสดงตาม role
       if (query === '/help') {
-        const staffInfo = getStaff(userId);
-        const role      = staffInfo ? staffInfo.role : null;
-        let msg         = '📋 คำสั่งที่ใช้ได้\n\n👤 ทุกคน\n/myid\n/help';
-        if (role === 'admin') {
+        let msg = '📋 คำสั่งที่ใช้ได้\n\n👤 ทุกคน\n/myid\n/help';
+        if (isAdmin) {
           msg += '\n\n👑 Admin เท่านั้น\n' +
-                '/add <userId> <ชื่อ> <role>\n' +
-                '/remove <userId>\n' +
-                '/setstatus <userId> <active|inactive>\n' +
-                '/setrole <userId> <admin|staff>\n' +
-                '/list\n' +
-                '/status <userId>\n' +
-                '/whois\n' +
-                '/visitors\n' +
-                '/log <จำนวน>\n' +
-                '/clearcache';
+                 '/add <userId> <ชื่อ> <role>\n' +
+                 '/remove <userId>\n' +
+                 '/setstatus <userId> <active|inactive>\n' +
+                 '/setrole <userId> <admin|staff>\n' +
+                 '/list\n' +
+                 '/status <userId>\n' +
+                 '/whois\n' +
+                 '/visitors\n' +
+                 '/log <จำนวน>\n' +
+                 '/clearcache';
         }
         return replyToLine(replyToken, msg);
       }
 
+      // ถ้าไม่ใช่ Admin → ต้องอยู่ในกลุ่มที่อนุญาตเท่านั้น
+      if (!isAdmin) {
+        const isAllowedGroup = groupId && ALLOWED_GROUP_IDS.includes(groupId);
+        if (!isAllowedGroup) {
+          return replyToLine(replyToken, '🚫 กรุณาใช้งานในกลุ่มที่กำหนดเท่านั้นครับ');
+        }
+      }
+
+      // Track ผู้ใช้
+      trackUser(userId, lineName);
+
       // ตรวจสอบสิทธิ์
-      const staff = getStaff(userId);
       if (!staff) {
         return replyToLine(replyToken, '🚫 ไม่มีสิทธิ์เข้าถึงระบบ\nกรุณาติดต่อนิติบุคคล');
       }
 
       // Admin Commands
       if (query.startsWith('/')) {
-        if (staff.role === 'admin') {
+        if (isAdmin) {
           const cmdResult = handleAdminCommand(query, userId, event);
           replyToLine(replyToken, cmdResult);
         } else {
