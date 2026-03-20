@@ -5,6 +5,7 @@
  */
 function extractPlateFromImage(imageId) {
   try {
+    LAST_OCR_STATUS = 'idle';
     if (!LINE_ACCESS_TOKEN || !GEMINI_API_KEY) return null;
 
     const imageResponse = UrlFetchApp.fetch(
@@ -16,6 +17,7 @@ function extractPlateFromImage(imageId) {
     );
 
     if (imageResponse.getResponseCode() !== 200) {
+      LAST_OCR_STATUS = 'line_error';
       console.error('LINE Content API Error: ' + imageResponse.getContentText());
       return null;
     }
@@ -55,8 +57,15 @@ function extractPlateFromImage(imageId) {
       }
     );
 
+    if (response.getResponseCode() === 429) {
+      LAST_OCR_STATUS = 'gemini_rate_limit';
+      console.error('Gemini API Rate Limit: ' + response.getContentText());
+      return null;
+    }
+
     const json = JSON.parse(response.getContentText());
     if (json.error) {
+      LAST_OCR_STATUS = classifyGeminiError(json.error);
       console.error('Gemini API Error: ' + JSON.stringify(json.error));
       return null;
     }
@@ -70,13 +79,30 @@ function extractPlateFromImage(imageId) {
                    ? json.candidates[0].content.parts[0].text.trim()
                    : null;
 
-    if (!text || text.toLowerCase() === 'null') return null;
+    if (!text || text.toLowerCase() === 'null') {
+      LAST_OCR_STATUS = 'no_text';
+      return null;
+    }
 
+    LAST_OCR_STATUS = 'success';
     return cleanPlateText(text);
   } catch (err) {
+    LAST_OCR_STATUS = 'exception';
     console.error('extractPlateFromImage Error: ' + err.message);
     return null;
   }
+}
+
+function classifyGeminiError(error) {
+  const code = error && error.code;
+  const status = error && error.status;
+  const message = error && error.message ? error.message.toLowerCase() : '';
+
+  if (code === 429 || status === 'RESOURCE_EXHAUSTED' || message.indexOf('quota') !== -1 || message.indexOf('rate') !== -1) {
+    return 'gemini_rate_limit';
+  }
+
+  return 'gemini_error';
 }
 
 function cleanPlateText(rawText) {

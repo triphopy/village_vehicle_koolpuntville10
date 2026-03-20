@@ -54,6 +54,8 @@ const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
   .map(id => id.trim())
   .filter(id => id);
 
+let LAST_OCR_STATUS = 'idle';
+
 // ============================
 // 2. REFACTORED STRUCTURE
 // ============================

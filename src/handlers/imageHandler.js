@@ -26,10 +26,13 @@ function handleImageMessage(context) {
   const plateText = extractPlateFromImage(imageId);
 
   if (!plateText) {
-    writeLog(userId, staff.name, lineName, '[OCR] ส่งรูป', 'อ่านไม่ได้');
+    const isRateLimit = LAST_OCR_STATUS === 'gemini_rate_limit';
+    writeLog(userId, staff.name, lineName, '[OCR] ส่งรูป', isRateLimit ? 'OCR ระบบหนาแน่น' : 'อ่านไม่ได้');
     replyToLine(
       replyToken,
-      '📷 อ่านป้ายไม่ชัด\nผลตรวจ: กรุณาถ่ายใหม่ หรือพิมพ์เลขทะเบียน'
+      isRateLimit
+        ? '⚠️ ระบบ OCR ใช้งานหนาแน่นชั่วคราว\nผลตรวจ: กรุณาลองใหม่อีกครั้ง'
+        : '📷 อ่านป้ายไม่ชัด\nผลตรวจ: กรุณาถ่ายใหม่ หรือพิมพ์เลขทะเบียน'
     );
     return;
   }
