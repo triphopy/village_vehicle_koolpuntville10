@@ -331,9 +331,7 @@ function isPartialPlateQuery(query) {
   if (/^\d{3,4}$/.test(normalized)) return false;
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return false;
   if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return false;
-  const thaiMatches = normalized.match(/[ก-ฮ]/g) || [];
-  const digitMatches = normalized.match(/\d/g) || [];
-  return thaiMatches.length >= 2 && digitMatches.length >= 2;
+  return /^(?:[ก-ฮ]{2,3}\d{2,4}|\d{1,2}[ก-ฮ]{2}\d{2,3}|[ก-ฮ]{1}\d{2,4})$/.test(normalized);
 }
 
 function isTailNumberSearchQuery(query) {
@@ -343,12 +341,10 @@ function isTailNumberSearchQuery(query) {
 
 function looksLikePlateQuery(normalized) {
   if (!normalized) return false;
-
-  const hasThai = /[ก-ฮ]/.test(normalized);
-  const hasDigit = /\d/.test(normalized);
-
   if (/^\d{3,4}$/.test(normalized)) return true;
-  if (hasThai && hasDigit) return true;
+  if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
+  if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
+  if (/^(?:[ก-ฮ]{2,3}\d{2,4}|\d{1,2}[ก-ฮ]{2}\d{2,3}|[ก-ฮ]{1}\d{2,4})$/.test(normalized)) return true;
 
   return false;
 }
