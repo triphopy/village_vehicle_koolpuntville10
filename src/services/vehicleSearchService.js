@@ -22,7 +22,7 @@ function searchByPlate(query) {
   }).join('\n\n');
 
   const header = matches.length > 1
-    ? '✅ พบข้อมูล ' + matches.length + ' รายการ\n\n'
+    ? '⚠️ พบหลายคัน กรุณาตรวจทะเบียนให้ตรงอีกครั้ง\n✅ พบข้อมูล ' + matches.length + ' รายการ\n\n'
     : '✅ พบข้อมูลในระบบ\n\n';
 
   return { found: true, message: header + msg };

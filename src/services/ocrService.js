@@ -8,89 +8,126 @@ function extractPlateFromImage(imageId) {
     LAST_OCR_STATUS = 'idle';
     if (!LINE_ACCESS_TOKEN || !GEMINI_API_KEY) return null;
 
-    const imageResponse = UrlFetchApp.fetch(
-      'https://api-data.line.me/v2/bot/message/' + imageId + '/content',
-      {
-        headers: { Authorization: 'Bearer ' + LINE_ACCESS_TOKEN },
-        muteHttpExceptions: true
-      }
-    );
+    const imageBlob = fetchLineImageBlob(imageId);
+    if (!imageBlob) return null;
 
-    if (imageResponse.getResponseCode() !== 200) {
-      LAST_OCR_STATUS = 'line_error';
-      console.error('LINE Content API Error: ' + imageResponse.getContentText());
-      return null;
-    }
-
-    const imageBlob = imageResponse.getBlob();
-    const base64 = Utilities.base64Encode(imageBlob.getBytes());
-
-    const response = UrlFetchApp.fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY,
-      {
-        method: 'post',
-        contentType: 'application/json',
-        muteHttpExceptions: true,
-        payload: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                inline_data: {
-                  mime_type: imageBlob.getContentType() || 'image/jpeg',
-                  data: base64
-                }
-              },
-              {
-                text: 'ดูรูปนี้แล้วหาป้ายทะเบียนรถ\n' +
-                      'ตอบแค่ตัวอักษรและตัวเลขบนป้ายทะเบียนเท่านั้น ไม่ต้องมีช่องว่าง เช่น "กข1234" หรือ "1กข2345"\n' +
-                      'ถ้ามีหลายป้าย ให้ตอบป้ายที่เห็นชัดที่สุดเพียงป้ายเดียว\n' +
-                      'ถ้าไม่มีป้ายทะเบียนหรืออ่านไม่ได้เลย ตอบว่า "null"\n' +
-                      'ห้ามอธิบาย ห้ามใส่ข้อความอื่นใด'
-              }
-            ]
-          }],
-          generationConfig: {
-            temperature: 0,
-            maxOutputTokens: 30
-          }
-        })
-      }
-    );
-
-    if (response.getResponseCode() === 429) {
-      LAST_OCR_STATUS = 'gemini_rate_limit';
-      console.error('Gemini API Rate Limit: ' + response.getContentText());
-      return null;
-    }
-
-    const json = JSON.parse(response.getContentText());
-    if (json.error) {
-      LAST_OCR_STATUS = classifyGeminiError(json.error);
-      console.error('Gemini API Error: ' + JSON.stringify(json.error));
-      return null;
-    }
-
-    const text = json.candidates &&
-                 json.candidates[0] &&
-                 json.candidates[0].content &&
-                 json.candidates[0].content.parts &&
-                 json.candidates[0].content.parts[0] &&
-                 json.candidates[0].content.parts[0].text
-                   ? json.candidates[0].content.parts[0].text.trim()
-                   : null;
-
-    if (!text || text.toLowerCase() === 'null') {
+    const firstPass = requestPlateOcr(imageBlob, buildOcrPrompt());
+    if (!firstPass || firstPass.toLowerCase() === 'null') {
       LAST_OCR_STATUS = 'no_text';
       return null;
     }
 
+    const cleanedFirstPass = cleanPlateText(firstPass);
+    if (!cleanedFirstPass) {
+      LAST_OCR_STATUS = 'no_text';
+      return null;
+    }
+
+    if (!shouldRecheckPlate(cleanedFirstPass)) {
+      LAST_OCR_STATUS = 'success';
+      return cleanedFirstPass;
+    }
+
+    const secondPass = requestPlateOcr(imageBlob, buildRecheckOcrPrompt(cleanedFirstPass), 20);
+    const cleanedSecondPass = cleanPlateText(secondPass);
+
     LAST_OCR_STATUS = 'success';
-    return cleanPlateText(text);
+    return cleanedSecondPass || cleanedFirstPass;
   } catch (err) {
     LAST_OCR_STATUS = 'exception';
     console.error('extractPlateFromImage Error: ' + err.message);
     return null;
   }
+}
+
+function fetchLineImageBlob(imageId) {
+  const imageResponse = UrlFetchApp.fetch(
+    'https://api-data.line.me/v2/bot/message/' + imageId + '/content',
+    {
+      headers: { Authorization: 'Bearer ' + LINE_ACCESS_TOKEN },
+      muteHttpExceptions: true
+    }
+  );
+
+  if (imageResponse.getResponseCode() !== 200) {
+    LAST_OCR_STATUS = 'line_error';
+    console.error('LINE Content API Error: ' + imageResponse.getContentText());
+    return null;
+  }
+
+  return imageResponse.getBlob();
+}
+
+function requestPlateOcr(imageBlob, promptText, maxOutputTokens) {
+  const response = UrlFetchApp.fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY,
+    {
+      method: 'post',
+      contentType: 'application/json',
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        contents: [{
+          parts: [
+            {
+              inline_data: {
+                mime_type: imageBlob.getContentType() || 'image/jpeg',
+                data: Utilities.base64Encode(imageBlob.getBytes())
+              }
+            },
+            {
+              text: promptText
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: maxOutputTokens || 30
+        }
+      })
+    }
+  );
+
+  if (response.getResponseCode() === 429) {
+    LAST_OCR_STATUS = 'gemini_rate_limit';
+    console.error('Gemini API Rate Limit: ' + response.getContentText());
+    return null;
+  }
+
+  const json = JSON.parse(response.getContentText());
+  if (json.error) {
+    LAST_OCR_STATUS = classifyGeminiError(json.error);
+    console.error('Gemini API Error: ' + JSON.stringify(json.error));
+    return null;
+  }
+
+  return json.candidates &&
+    json.candidates[0] &&
+    json.candidates[0].content &&
+    json.candidates[0].content.parts &&
+    json.candidates[0].content.parts[0] &&
+    json.candidates[0].content.parts[0].text
+      ? json.candidates[0].content.parts[0].text.trim()
+      : null;
+}
+
+function buildOcrPrompt() {
+  return 'ดูรูปนี้แล้วหาป้ายทะเบียนรถ\n' +
+    'ตอบแค่ตัวอักษรและตัวเลขบนป้ายทะเบียนเท่านั้น ไม่ต้องมีช่องว่าง เช่น "กข1234" หรือ "1กข2345"\n' +
+    'ทะเบียนอาจเป็นรูปแบบเช่น "กข1234", "งล441", "3ขฮ8777", "1กข2345", หรือ "80-1234"\n' +
+    'ระวังตัวที่หน้าคล้ายกัน เช่น "อ/ฮ/ฬ", "ข/ช", "8/B", และ "0/O"\n' +
+    'ถ้าแยกไม่ออกหรือไม่มั่นใจในตัวใดตัวหนึ่ง ให้ตอบ "null" ทันที\n' +
+    'ให้ตอบตามภาพจริงเท่านั้น ห้ามเดาจากทะเบียนที่คิดว่าน่าจะมีในระบบ\n' +
+    'ถ้ามีหลายป้าย ให้ตอบป้ายที่เห็นชัดที่สุดเพียงป้ายเดียว\n' +
+    'ถ้าไม่มีป้ายทะเบียนหรืออ่านไม่ได้เลย ตอบว่า "null"\n' +
+    'ห้ามอธิบาย ห้ามใส่ข้อความอื่นใด';
+}
+
+function buildRecheckOcrPrompt(firstPassPlate) {
+  return 'ตรวจย้ำเลขทะเบียนในภาพอีกครั้งอย่างระมัดระวัง\n' +
+    'คำตอบก่อนหน้าที่ระบบอ่านได้คือ "' + firstPassPlate + '"\n' +
+    'ให้ดูจากภาพจริงเท่านั้น ห้ามยึดคำตอบก่อนหน้า ถ้าไม่แน่ใจให้ตอบ "null"\n' +
+    'ให้ระวังตัวคล้ายกัน เช่น "อ/ฮ/ฬ", "ข/ช", "8/B", และ "0/O"\n' +
+    'ตอบเฉพาะเลขทะเบียนหนึ่งค่า โดยไม่ต้องใส่ช่องว่าง และห้ามอธิบาย';
 }
 
 function classifyGeminiError(error) {
@@ -108,8 +145,12 @@ function classifyGeminiError(error) {
 function cleanPlateText(rawText) {
   if (!rawText) return null;
 
-  const original = rawText.trim();
+  const original = rawText.trim()
+    .replace(/["'`]/g, '')
+    .replace(/[：:]/g, ' ')
+    .replace(/\s+/g, ' ');
   const cleaned = original.replace(/[\s\-]/g, '');
+  const cleanedUpper = cleaned.toUpperCase();
 
   const patterns = [
     /^[ก-ฮ]{1,3}\d{1,4}$/,
@@ -118,40 +159,71 @@ function cleanPlateText(rawText) {
   ];
 
   if (/^\d{1,2}-\d{4}$/.test(original)) return original;
-  if (patterns.some(function (pattern) { return pattern.test(cleaned); })) return cleaned;
+  if (patterns.some(function (pattern) { return pattern.test(cleanedUpper); })) return cleanedUpper;
 
-  const extracted = cleaned.match(/[ก-ฮ]{1,3}\d{1,4}|\d{1,2}[ก-ฮ]{1,2}\d{4}|\d{1,2}\d{4}/);
-  return extracted ? extracted[0] : null;
+  const extracted = cleanedUpper.match(/[ก-ฮ]{1,3}\d{1,4}|\d{1,2}[ก-ฮ]{1,2}\d{4}|\d{1,2}\d{4}/);
+  if (extracted) return extracted[0];
+
+  const spacedPatterns = [
+    /([ก-ฮ]{1,3})\s*(\d{1,4})/,
+    /(\d{1,2})\s*([ก-ฮ]{1,2})\s*(\d{4})/,
+    /(\d{1,2})\s*-\s*(\d{4})/
+  ];
+
+  for (let i = 0; i < spacedPatterns.length; i++) {
+    const match = original.toUpperCase().match(spacedPatterns[i]);
+    if (match) {
+      return match.slice(1).join('').replace(/\s/g, '');
+    }
+  }
+
+  const tokens = original.toUpperCase().split(/\s+/).filter(function (token) { return token; });
+  for (let j = 0; j < tokens.length; j++) {
+    const candidate = tokens[j].replace(/[\s\-]/g, '');
+    if (patterns.some(function (pattern) { return pattern.test(candidate); })) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
 
 function compactPlateText(text) {
   return (text || '').toString().replace(/\s/g, '');
 }
 
-function fuzzySearchPlate(ocrText) {
-  if (!ocrText) return null;
+function shouldRecheckPlate(plateText) {
+  if (!plateText) return false;
+  return /[อฮฬขช0OQDB8]/.test(plateText);
+}
 
-  const data = getCachedSheetData('Vehicles');
-  const normalizedOcr = normalizePlateForComparison(ocrText);
-  const plates = data.slice(1).map(function (row) {
-    const plate = compactPlateText(row[COL_VEHICLE.PLATE]);
-    return {
-      plate: plate,
-      normalized: normalizePlateForComparison(plate)
-    };
+function normalizePlateForComparison(text) {
+  if (!text) return '';
+
+  const compact = compactPlateText(text);
+  const confusionGroups = [
+    ['ฮ', 'อ', 'ฬ'],
+    ['ข', 'ช'],
+    ['บ', '6'],
+    ['0', 'O', 'D', 'Q'],
+    ['1', 'I', 'l'],
+    ['2', 'Z'],
+    ['5', 'S'],
+    ['8', 'B']
+  ];
+
+  const map = {};
+  confusionGroups.forEach(function (group) {
+    const canonical = group[0];
+    group.forEach(function (char) {
+      map[char] = canonical;
+    });
   });
 
-  const best = plates
-    .map(function (item) {
-      return {
-        plate: item.plate,
-        score: stringSimilarity(normalizedOcr, item.normalized)
-      };
-    })
-    .filter(function (item) { return item.score >= 0.75; })
-    .sort(function (a, b) { return b.score - a.score; })[0];
-
-  return best ? best.plate : null;
+  return compact
+    .split('')
+    .map(function (char) { return map[char] || char; })
+    .join('');
 }
 
 function resolvePlateFromOcr(ocrText) {
@@ -261,33 +333,30 @@ function getPlateConfusionMap() {
   };
 }
 
-function normalizePlateForComparison(text) {
-  if (!text) return '';
+function fuzzySearchPlate(ocrText) {
+  if (!ocrText) return null;
 
-  const compact = compactPlateText(text);
-  const confusionGroups = [
-    ['ฮ', 'อ', 'ฬ'],
-    ['ข', 'ช'],
-    ['บ', '6'],
-    ['0', 'O', 'D', 'Q'],
-    ['1', 'I', 'l'],
-    ['2', 'Z'],
-    ['5', 'S'],
-    ['8', 'B']
-  ];
-
-  const map = {};
-  confusionGroups.forEach(function (group) {
-    const canonical = group[0];
-    group.forEach(function (char) {
-      map[char] = canonical;
-    });
+  const data = getCachedSheetData('Vehicles');
+  const normalizedOcr = normalizePlateForComparison(ocrText);
+  const plates = data.slice(1).map(function (row) {
+    const plate = compactPlateText(row[COL_VEHICLE.PLATE]);
+    return {
+      plate: plate,
+      normalized: normalizePlateForComparison(plate)
+    };
   });
 
-  return compact
-    .split('')
-    .map(function (char) { return map[char] || char; })
-    .join('');
+  const best = plates
+    .map(function (item) {
+      return {
+        plate: item.plate,
+        score: stringSimilarity(normalizedOcr, item.normalized)
+      };
+    })
+    .filter(function (item) { return item.score >= 0.75; })
+    .sort(function (a, b) { return b.score - a.score; })[0];
+
+  return best ? best.plate : null;
 }
 
 function stringSimilarity(a, b) {
