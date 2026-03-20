@@ -9,7 +9,7 @@ function searchByPlate(query) {
   if (matches.length === 0) {
     return {
       found: false,
-      message: '❌ ไม่พบทะเบียนนี้ในระบบ\nกรุณาแลกบัตรตามขั้นตอนปกติ'
+      message: '❌ ไม่พบข้อมูลรถในระบบ\nกรุณาแลกบัตรตามขั้นตอนปกติ'
     };
   }
 
