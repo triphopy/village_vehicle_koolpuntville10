@@ -148,7 +148,6 @@ function formatVehicleLine(row) {
 
 function findSuggestedPlates(query, forcedSuggestions, limit) {
   const maxItems = limit || 3;
-  const data = getCachedSheetData('Vehicles');
   const queryCompact = compactPlateText(query).toUpperCase();
   const queryNormalized = normalizePlateForComparison(queryCompact);
   const unique = {};
@@ -164,6 +163,17 @@ function findSuggestedPlates(query, forcedSuggestions, limit) {
 
   forcedSuggestions.forEach(pushSuggestion);
 
+  if (queryCompact) {
+    const candidateMap = buildPlateCandidateMap();
+    const generatedCandidates = generatePlateCandidates(queryCompact, 2);
+    generatedCandidates.forEach(function (candidate) {
+      if (candidateMap[candidate]) {
+        pushSuggestion(candidateMap[candidate]);
+      }
+    });
+  }
+
+  const data = getCachedSheetData('Vehicles');
   const scored = data.slice(1).map(function (row) {
     const plate = compactPlateText(row[COL_VEHICLE.PLATE]).toUpperCase();
     return {
