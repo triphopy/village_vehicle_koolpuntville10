@@ -250,6 +250,7 @@ function isValidPlateSearchQuery(query) {
   if (/^\d{4}$/.test(normalized)) return true;
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
   if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
+  if (isPartialPlateQuery(query)) return true;
   return false;
 }
 
