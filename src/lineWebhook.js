@@ -1,5 +1,6 @@
 /**
- * 🏢 Vehicle Verification System (Group Event + UID Tracking)
+ * 🏢 Vehicle Verification System (Group Event + UID Tracking + OCR)
+ * เพิ่ม: OCR ด้วย Gemini 2.5 Flash-Lite + Fuzzy Match
  */
 
 // ============================
@@ -8,12 +9,13 @@
 const props               = PropertiesService.getScriptProperties();
 const LINE_ACCESS_TOKEN   = props.getProperty('LINE_ACCESS_TOKEN');
 const LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
+const GEMINI_API_KEY      = props.getProperty('GEMINI_API_KEY');       // 🆕 เพิ่มใน Script Properties
 const RETENTION_DAYS      = Number(props.getProperty('LOG_RETENTION_DAYS')) || 30;
 const BACKUPRETENTION_DAYS      = Number(props.getProperty('BACKUP_RETENTION_DAYS')) || 30;
 
 const CACHE_TIME          = 3600;
 const BACKUP_FOLDER_NAME  = props.getProperty('BACKUP_FOLDER_NAME');
-const SPREADSHEET_ID = props.getProperty('SPREADSHEET_ID');
+const SPREADSHEET_ID      = props.getProperty('SPREADSHEET_ID');
 
 const COL_VEHICLE = {
   PLATE  : 0,
@@ -47,7 +49,6 @@ const COL_LOG = {
   RESULT    : 5
 };
 
-// ดึง Allowed Group IDs จาก Properties
 const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
   .split(',')
   .map(id => id.trim())
@@ -66,7 +67,6 @@ function doPost(e) {
 
     debugToLine(JSON.stringify(e, null, 2));
 
-
     const data = JSON.parse(e.postData.contents);
     if (!data.events) return ContentService.createTextOutput('OK');
 
@@ -77,7 +77,7 @@ function doPost(e) {
 
       if (!userId) return;
 
-      // ตอนแอด Bot → ส่ง User ID กลับอัตโนมัติ
+      // ตอนแอด Bot
       if (event.type === 'follow') {
         return replyToLine(replyToken,
           '👋 สวัสดีครับ!\n\n' +
@@ -86,12 +86,55 @@ function doPost(e) {
         );
       }
 
+      // 🆕 รองรับรูปภาพ (OCR)
+      if (event.type === 'message' && event.message.type === 'image') {
+        const lineName = getLineDisplayName(userId);
+        const staff    = getStaff(userId);
+        const isAdmin  = staff && staff.role === 'admin';
+
+        // ตรวจสิทธิ์กลุ่ม (เหมือน text)
+        if (!isAdmin) {
+          const isAllowedGroup = groupId && ALLOWED_GROUP_IDS.includes(groupId);
+          if (!isAllowedGroup) {
+            return replyToLine(replyToken, '🚫 กรุณาใช้งานในกลุ่มที่กำหนดเท่านั้นครับ');
+          }
+        }
+
+        trackUser(userId, lineName);
+
+        if (!staff) {
+          return replyToLine(replyToken, '🚫 ไม่มีสิทธิ์เข้าถึงระบบ\nกรุณาติดต่อนิติบุคคล');
+        }
+
+        const imageId   = event.message.id;
+        const plateText = extractPlateFromImage(imageId);
+
+        if (!plateText) {
+          writeLog(userId, staff.name, lineName, '[OCR] ส่งรูป', 'อ่านไม่ได้');
+          return replyToLine(replyToken,
+            '📷 อ่านทะเบียนไม่ได้ครับ\n\nกรุณาลองใหม่:\n• ถ่ายให้ใกล้และชัดขึ้น\n• แสงเพียงพอ\n• หรือพิมพ์เลขทะเบียนตรงๆ ได้เลยครับ'
+          );
+        }
+
+        // Fuzzy Match กับทะเบียนในระบบ
+        const matchedPlate = fuzzySearchPlate(plateText);
+        const result       = searchByPlate(matchedPlate || plateText);
+
+        const ocrNote = (matchedPlate && matchedPlate !== plateText)
+          ? '🔍 OCR อ่านได้: "' + plateText + '"\n📝 จับคู่กับ: "' + matchedPlate + '"\n\n'
+          : '🔍 OCR อ่านได้: "' + plateText + '"\n\n';
+
+        writeLog(userId, staff.name, lineName, '[OCR] ' + plateText, result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
+        return replyToLine(replyToken, ocrNote + result.message);
+      }
+
+      // กรองเฉพาะ text
       if (event.type !== 'message' || event.message.type !== 'text') return;
 
-      const query    = event.message.text.trim();
-      
+      const query = event.message.text.trim();
+
       if (query.length > 50) {
-        return replyToLine(replyToken, '❌ ข้อความยาวเกินไป กรุณาลองใหม่ครับ');      
+        return replyToLine(replyToken, '❌ ข้อความยาวเกินไป กรุณาลองใหม่ครับ');
       }
 
       const lineName = getLineDisplayName(userId);
@@ -113,7 +156,7 @@ function doPost(e) {
         return replyToLine(replyToken, lines.join('\n'));
       }
 
-      // /help → ทุกคนใช้ได้ แต่แสดงตาม role
+      // /help → ทุกคนใช้ได้
       if (query === '/help') {
         let msg = '📋 คำสั่งที่ใช้ได้\n\n👤 ทุกคน\n/myid\n/help';
         if (isAdmin) {
@@ -132,7 +175,7 @@ function doPost(e) {
         return replyToLine(replyToken, msg);
       }
 
-      // ถ้าไม่ใช่ Admin → ต้องอยู่ในกลุ่มที่อนุญาตเท่านั้น
+      // ถ้าไม่ใช่ Admin → ต้องอยู่ในกลุ่มที่อนุญาต
       if (!isAdmin) {
         const isAllowedGroup = groupId && ALLOWED_GROUP_IDS.includes(groupId);
         if (!isAllowedGroup) {
@@ -140,10 +183,8 @@ function doPost(e) {
         }
       }
 
-      // Track ผู้ใช้
       trackUser(userId, lineName);
 
-      // ตรวจสอบสิทธิ์
       if (!staff) {
         return replyToLine(replyToken, '🚫 ไม่มีสิทธิ์เข้าถึงระบบ\nกรุณาติดต่อนิติบุคคล');
       }
@@ -151,8 +192,7 @@ function doPost(e) {
       // Admin Commands
       if (query.startsWith('/')) {
         if (isAdmin) {
-          const cmdResult = handleAdminCommand(query, userId, event);
-          replyToLine(replyToken, cmdResult);
+          replyToLine(replyToken, handleAdminCommand(query, userId, event));
         } else {
           replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');
         }
@@ -179,7 +219,160 @@ function doPost(e) {
 }
 
 // ============================
-// 3. ADMIN COMMAND CENTER
+// 3. OCR ENGINE 🆕
+// ============================
+
+/**
+ * รับ imageId จาก LINE → ดึงรูป → ส่ง Gemini 2.5 Flash-Lite → คืนค่าทะเบียน
+ * @param {string} imageId
+ * @returns {string|null}
+ */
+function extractPlateFromImage(imageId) {
+  try {
+    // 1. ดึงรูปจาก LINE Content API
+    const imageBlob = UrlFetchApp.fetch(
+      'https://api-data.line.me/v2/bot/message/' + imageId + '/content',
+      {
+        headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN },
+        muteHttpExceptions: true
+      }
+    ).getBlob();
+
+    // 2. แปลงเป็น base64
+    const base64 = Utilities.base64Encode(imageBlob.getBytes());
+
+    // 3. เรียก Gemini 2.5 Flash-Lite
+    const response = UrlFetchApp.fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY,
+      {
+        method: 'post',
+        contentType: 'application/json',
+        muteHttpExceptions: true,
+        payload: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                inline_data: {
+                  mime_type: 'image/jpeg',
+                  data: base64
+                }
+              },
+              {
+                text: 'ดูรูปนี้แล้วหาป้ายทะเบียนรถ\n' +
+                      'ตอบแค่ตัวอักษรและตัวเลขบนป้ายทะเบียนเท่านั้น ไม่ต้องมีช่องว่าง เช่น "กข1234" หรือ "1กข2345"\n' +
+                      'ถ้ามีหลายป้าย ให้ตอบป้ายที่เห็นชัดที่สุดเพียงป้ายเดียว\n' +
+                      'ถ้าไม่มีป้ายทะเบียนหรืออ่านไม่ได้เลย ตอบว่า "null"\n' +
+                      'ห้ามอธิบาย ห้ามใส่ข้อความอื่นใด'
+              }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0,      // ให้คำตอบแน่นอน ไม่สุ่ม
+            maxOutputTokens: 30  // ทะเบียนสั้น ไม่ต้องการ token เยอะ
+          }
+        })
+      }
+    );
+
+    const json = JSON.parse(response.getContentText());
+
+    // Handle Gemini error
+    if (json.error) {
+      console.error('Gemini API Error: ' + JSON.stringify(json.error));
+      return null;
+    }
+
+    const text = json.candidates &&
+                 json.candidates[0] &&
+                 json.candidates[0].content &&
+                 json.candidates[0].content.parts &&
+                 json.candidates[0].content.parts[0] &&
+                 json.candidates[0].content.parts[0].text
+                   ? json.candidates[0].content.parts[0].text.trim()
+                   : null;
+
+    if (!text || text.toLowerCase() === 'null') return null;
+
+    return cleanPlateText(text);
+
+  } catch(err) {
+    console.error('extractPlateFromImage Error: ' + err.message);
+    return null;
+  }
+}
+
+/**
+ * Clean ข้อความจาก OCR → เหลือแค่ทะเบียน
+ */
+function cleanPlateText(rawText) {
+  if (!rawText) return null;
+
+  const cleaned = rawText.replace(/[\s\-]/g, '');
+
+  const patterns = [
+    /^[ก-ฮ]{1,3}\d{1,4}$/,       // กข1234, กขค123
+    /^\d{1,2}[ก-ฮ]{1,2}\d{4}$/,  // 1กข2345
+    /^\d{1,2}-\d{4}$/             // 80-1234
+  ];
+
+  if (patterns.some(p => p.test(cleaned))) return cleaned;
+
+  // ถ้าไม่ตรง pattern → ลองดึงส่วนที่น่าจะเป็นทะเบียน
+  const extracted = cleaned.match(/[ก-ฮ]{1,3}\d{1,4}/);
+  return extracted ? extracted[0] : null;
+}
+
+/**
+ * Fuzzy Match: หาทะเบียนในระบบที่คล้ายกับที่ OCR อ่านได้มากที่สุด
+ * แก้ปัญหา OCR สับสน อ↔ฮ, ก↔า ฯลฯ
+ * @param {string} ocrText
+ * @returns {string|null}
+ */
+function fuzzySearchPlate(ocrText) {
+  if (!ocrText) return null;
+
+  const data   = getCachedSheetData('Vehicles');
+  const plates = data.slice(1).map(row =>
+    row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '')
+  );
+
+  const THRESHOLD = 0.75; // ความคล้ายขั้นต่ำ 75%
+
+  const best = plates
+    .map(plate => ({ plate, score: stringSimilarity(ocrText, plate) }))
+    .filter(r => r.score >= THRESHOLD)
+    .sort((a, b) => b.score - a.score)[0];
+
+  return best ? best.plate : null;
+}
+
+/**
+ * คำนวณความคล้ายระหว่าง 2 string (0-1) ด้วย Levenshtein Distance
+ */
+function stringSimilarity(a, b) {
+  const longer  = a.length >= b.length ? a : b;
+  const shorter = a.length >= b.length ? b : a;
+  if (longer.length === 0) return 1.0;
+  return (longer.length - editDistance(longer, shorter)) / longer.length;
+}
+
+function editDistance(a, b) {
+  const dp = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = i;
+    for (let j = 1; j <= b.length; j++) {
+      const temp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1]
+        ? dp[j - 1]
+        : 1 + Math.min(dp[j], dp[j - 1], prev);
+      prev = temp;
+    }
+  }
+  return dp[b.length];
+}
+
+// ============================
+// 4. ADMIN COMMAND CENTER
 // ============================
 function handleAdminCommand(query, adminId, event) {
   const parts   = query.split(/\s+/);
@@ -300,9 +493,11 @@ function handleAdminCommand(query, adminId, event) {
       dataRows.forEach(row => {
         const uid      = row[COL_VISITOR.UID]         || '-';
         const name     = row[COL_VISITOR.DISPLAYNAME] || '-';
-        const lastSeen = row[COL_VISITOR.LAST_SEEN] ? Utilities.formatDate(new Date(row[COL_VISITOR.LAST_SEEN]), 'Asia/Bangkok', 'dd/MM HH:mm') : '-';
-        const s        = getStaff(uid);
-        const icon     = s ? '✅' : '❓';
+        const lastSeen = row[COL_VISITOR.LAST_SEEN]
+          ? Utilities.formatDate(new Date(row[COL_VISITOR.LAST_SEEN]), 'Asia/Bangkok', 'dd/MM HH:mm')
+          : '-';
+        const s    = getStaff(uid);
+        const icon = s ? '✅' : '❓';
         lines.push(icon + ' ' + name + '\n    ' + uid + '\n    last: ' + lastSeen);
       });
       return lines.join('\n');
@@ -317,7 +512,9 @@ function handleAdminCommand(query, adminId, event) {
       const lastRows = dataRows.slice(-limit).reverse();
       const lines    = ['📋 Log ' + limit + ' รายการล่าสุด\n'];
       lastRows.forEach(row => {
-        const time = row[COL_LOG.TIMESTAMP] ? Utilities.formatDate(new Date(row[COL_LOG.TIMESTAMP]), 'Asia/Bangkok', 'dd/MM HH:mm') : '-';
+        const time = row[COL_LOG.TIMESTAMP]
+          ? Utilities.formatDate(new Date(row[COL_LOG.TIMESTAMP]), 'Asia/Bangkok', 'dd/MM HH:mm')
+          : '-';
         const name = row[COL_LOG.STAFF_NAME] || row[COL_LOG.UID] || '-';
         const q    = row[COL_LOG.QUERY]  || '-';
         const res  = row[COL_LOG.RESULT] || '-';
@@ -348,9 +545,8 @@ function handleAdminCommand(query, adminId, event) {
 }
 
 // ============================
-// 4. SEARCH ENGINE
+// 5. SEARCH ENGINE
 // ============================
-
 function searchByPlate(query) {
   const data = getCachedSheetData('Vehicles');
   const q    = query.replace(/\s/g, '').toLowerCase();
@@ -403,7 +599,7 @@ function searchByHouse(query) {
 }
 
 // ============================
-// 5. DATA ACCESS & CACHING
+// 6. DATA ACCESS & CACHING
 // ============================
 function getCachedSheetData(sheetName) {
   const cache  = CacheService.getScriptCache();
@@ -443,13 +639,13 @@ function getStaff(userId) {
 
 function clearStaffCache(userId) {
   const cache = CacheService.getScriptCache();
-  cache.remove('staff_' + userId); // cache รายคน
-  cache.remove('staff');            // ✅ เพิ่ม: cache Sheet ทั้งหมด
-  cache.remove('staff_list');       // cache รายชื่อ
+  cache.remove('staff_'  + userId);
+  cache.remove('staff');
+  cache.remove('staff_list');
 }
 
 // ============================
-// 6. UTILITIES
+// 7. UTILITIES
 // ============================
 function trackUser(userId, displayName) {
   const cache    = CacheService.getScriptCache();
@@ -470,8 +666,8 @@ function trackUser(userId, displayName) {
 }
 
 function writeLog(uid, sName, lName, q, res) {
-  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Log');
-  sheet.appendRow([new Date(), uid, sName, lName, q, res]);
+  SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Log')
+    .appendRow([new Date(), uid, sName, lName, q, res]);
 }
 
 function getLineDisplayName(userId) {
@@ -482,7 +678,7 @@ function getLineDisplayName(userId) {
   if (cached) return cached;
 
   try {
-    const res    = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + userId, {
+    const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + userId, {
       headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN },
       muteHttpExceptions: true
     });
@@ -536,7 +732,7 @@ function getStatusLabel(status) {
 }
 
 // ============================
-// 7. AUTO MAINTENANCE
+// 8. AUTO MAINTENANCE
 // ============================
 function keepAlive() {
   Logger.log('keep alive: ' + new Date());
@@ -559,7 +755,6 @@ function dailyCleanup() {
   });
 }
 
-// Backup Functions
 function getOrCreateBackupFolder() {
   const folders = DriveApp.getFoldersByName(BACKUP_FOLDER_NAME);
   return folders.hasNext()
@@ -568,33 +763,29 @@ function getOrCreateBackupFolder() {
 }
 
 function dailyBackup() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss     = SpreadsheetApp.openById(SPREADSHEET_ID);
   const folder = getOrCreateBackupFolder();
-  const date = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd');
-
-  DriveApp.getFileById(ss.getId()).makeCopy(`Backup_${date}`, folder);
+  const date   = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd');
+  DriveApp.getFileById(ss.getId()).makeCopy('Backup_' + date, folder);
   console.log('Backup สำเร็จ: ' + date);
 }
 
 function cleanOldBackups() {
-  const folder = getOrCreateBackupFolder(); // ← เปลี่ยนจาก getFolderById('FOLDER_ID')
-  const files = folder.getFiles();
+  const folder = getOrCreateBackupFolder();
+  const files  = folder.getFiles();
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - BACKUPRETENTION_DAYS); // ← ใช้ตัวแปรที่มีอยู่แล้ว
-
+  cutoff.setDate(cutoff.getDate() - BACKUPRETENTION_DAYS);
   while (files.hasNext()) {
     const file = files.next();
-    if (file.getDateCreated() < cutoff) {
-      file.setTrashed(true);
-    }
+    if (file.getDateCreated() < cutoff) file.setTrashed(true);
   }
   console.log('✅ ลบ Backup เก่าเกิน ' + BACKUPRETENTION_DAYS + ' วันแล้ว');
 }
 
 function dailyMaintenance() {
-  dailyBackup();      // สำรองข้อมูล
-  cleanOldBackups();  // ลบ Backup เก่า
-  dailyCleanup();     // ล้าง Log เก่า
+  dailyBackup();
+  cleanOldBackups();
+  dailyCleanup();
   console.log('✅ Daily Maintenance เสร็จสิ้น: ' + new Date());
 }
 
@@ -609,9 +800,9 @@ function onEdit(e) {
     if (row <= 1) return;
     const userId = sheet.getRange(row, COL_STAFF.UID + 1).getValue();
     if (userId) {
-      cache.remove('staff_' + userId); // cache รายคน
-      cache.remove('staff_list');       // cache รายชื่อ
-      cache.remove('staff');            // ✅ เพิ่ม: cache Sheet ทั้งหมด
+      cache.remove('staff_' + userId);
+      cache.remove('staff_list');
+      cache.remove('staff');
       console.log('Auto-cleared cache for Staff ID: ' + userId);
     }
   }
@@ -623,7 +814,7 @@ function onEdit(e) {
 }
 
 function debugToLine(msg) {
-  if (props.getProperty('DEBUG_MODE') !== 'true') return; // ปิดอยู่ก็ไม่ทำงาน
+  if (props.getProperty('DEBUG_MODE') !== 'true') return;
   const ADMIN_UID = props.getProperty('ADMIN_UID');
   UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
     method: 'post',
