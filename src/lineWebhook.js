@@ -57,6 +57,11 @@ function doPost(e) {
       if (event.type !== 'message' || event.message.type !== 'text') return;
 
       const query    = event.message.text.trim();
+      
+      if (query.length > 50) {
+        return replyToLine(replyToken, '❌ ข้อความยาวเกินไป กรุณาลองใหม่ครับ');      
+      }
+      
       const lineName = getLineDisplayName(userId);
       const staff    = getStaff(userId);
       const isAdmin  = staff && staff.role === 'admin';
