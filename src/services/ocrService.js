@@ -29,10 +29,7 @@ function extractPlateFromImage(imageId) {
     const cleanedFirstPass = cleanPlateText(firstPass);
     if (!cleanedFirstPass) return null;
 
-    if (!shouldRecheckPlate(cleanedFirstPass)) return cleanedFirstPass;
-
-    const verified = verifySuspiciousPlate(base64, mimeType, cleanedFirstPass);
-    return verified || cleanedFirstPass;
+    return cleanedFirstPass;
   } catch (err) {
     console.error('extractPlateFromImage Error: ' + err.message);
     return null;
@@ -97,28 +94,6 @@ function buildPrimaryOcrPrompt() {
     'ถ้ามีหลายป้าย ให้ตอบเฉพาะป้ายที่เห็นชัดที่สุดเพียงป้ายเดียว\n' +
     'ถ้าอ่านไม่ชัดหรือไม่มั่นใจ ให้ตอบ "null"\n' +
     'ห้ามเดา ห้ามอธิบาย ห้ามใส่ข้อความอื่นใด';
-}
-
-function shouldRecheckPlate(plateText) {
-  if (!plateText) return false;
-  return /[อฮฬขชBbOoQqDd]/.test(plateText);
-}
-
-function verifySuspiciousPlate(base64, mimeType, firstPassPlate) {
-  const secondPass = callGeminiPlateOcr(
-    base64,
-    mimeType,
-    'ตรวจย้ำเลขทะเบียนในภาพอีกครั้งอย่างระมัดระวัง\n' +
-      'คำตอบก่อนหน้าที่ระบบอ่านได้คือ "' + firstPassPlate + '"\n' +
-      'ให้ดูจากภาพจริงเท่านั้น ห้ามยึดคำตอบก่อนหน้า ถ้าไม่แน่ใจให้ตอบ "null"\n' +
-      'ให้ระวังตัวคล้ายกัน เช่น "อ/ฮ/ฬ", "ข/ช", "8/B", และ "0/O"\n' +
-      'ตอบเฉพาะเลขทะเบียนหนึ่งค่า โดยไม่ต้องใส่ช่องว่าง และห้ามอธิบาย',
-    20
-  );
-
-  const cleanedSecondPass = cleanPlateText(secondPass);
-  if (!cleanedSecondPass) return null;
-  return cleanedSecondPass === firstPassPlate ? cleanedSecondPass : null;
 }
 
 function cleanPlateText(rawText) {
