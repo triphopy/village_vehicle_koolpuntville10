@@ -34,25 +34,37 @@ function handleImageMessage(context) {
     return;
   }
 
-  const correctedPlate = resolvePlateFromOcr(plateText);
-  const result = searchByPlate(correctedPlate || plateText);
-  const logQuery = correctedPlate && correctedPlate !== plateText
-    ? '[OCR] ' + plateText + ' -> ' + correctedPlate
-    : '[OCR] ' + plateText;
-  const logResult = correctedPlate && correctedPlate !== plateText
-    ? (result.found ? 'พบข้อมูล (แก้ OCR)' : 'ไม่พบข้อมูล (แก้ OCR)')
-    : (result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
+  const exactPlate = findExactPlateMatch(plateText);
+  const ocrNote = '🔍 อ่านจากรูปได้: ' + plateText + '\n\n';
 
-  const ocrNote = correctedPlate && correctedPlate !== plateText
-    ? '🔍 อ่านจากรูปได้: ' + plateText + '\n📝 ตรวจในระบบแล้ว: ' + correctedPlate + '\n⚠️ กรุณาตรวจป้ายอีกครั้งก่อนอนุญาต\n\n'
-    : '🔍 อ่านจากรูปได้: ' + plateText + '\n\n';
+  if (!exactPlate) {
+    const suggestions = getSuggestedPlateMatches(plateText);
+    const suggestionMessage = suggestions.length > 0
+      ? '❌ ไม่พบข้อมูลตรงตัวในระบบ\n\nใกล้เคียงที่อาจเป็น:\n• ' + suggestions.join('\n• ') + '\nผลตรวจ: กรุณาตรวจป้ายอีกครั้ง'
+      : '❌ ไม่พบข้อมูลตรงตัวในระบบ\nผลตรวจ: ให้แลกบัตร';
+    const logResult = suggestions.length > 0
+      ? 'ไม่พบตรงตัว (มีเลขใกล้เคียง)'
+      : 'ไม่พบตรงตัว';
+
+    writeLog(
+      userId,
+      staff.name,
+      lineName,
+      '[OCR] ' + plateText,
+      logResult
+    );
+    replyToLine(replyToken, ocrNote + suggestionMessage);
+    return;
+  }
+
+  const result = searchByPlate(exactPlate);
 
   writeLog(
     userId,
     staff.name,
     lineName,
-    logQuery,
-    logResult
+    '[OCR] ' + plateText,
+    result.found ? 'พบข้อมูลตรงตัว' : 'ไม่พบข้อมูล'
   );
   replyToLine(replyToken, ocrNote + result.message);
 }
