@@ -15,6 +15,38 @@ const CACHE_TIME          = 3600;
 const BACKUP_FOLDER_NAME  = props.getProperty('BACKUP_FOLDER_NAME');
 const SPREADSHEET_ID = props.getProperty('SPREADSHEET_ID');
 
+const COL_VEHICLE = {
+  PLATE  : 0,
+  BRAND  : 1,
+  MODEL  : 2,
+  COLOR  : 3,
+  HOUSE  : 4,
+  OWNER  : 5,
+  STATUS : 6
+};
+
+const COL_STAFF = {
+  NAME   : 0,
+  UID    : 1,
+  STATUS : 2,
+  ROLE   : 3
+};
+
+const COL_VISITOR = {
+  UID         : 0,
+  DISPLAYNAME : 1,
+  LAST_SEEN   : 2
+};
+
+const COL_LOG = {
+  TIMESTAMP : 0,
+  UID       : 1,
+  STAFF_NAME: 2,
+  LINE_NAME : 3,
+  QUERY     : 4,
+  RESULT    : 5
+};
+
 // ดึง Allowed Group IDs จาก Properties
 const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
   .split(',')
@@ -61,7 +93,7 @@ function doPost(e) {
       if (query.length > 50) {
         return replyToLine(replyToken, '❌ ข้อความยาวเกินไป กรุณาลองใหม่ครับ');      
       }
-      
+
       const lineName = getLineDisplayName(userId);
       const staff    = getStaff(userId);
       const isAdmin  = staff && staff.role === 'admin';
@@ -156,7 +188,6 @@ function handleAdminCommand(query, adminId, event) {
 
   switch(cmd) {
 
-    // /add <userId> <ชื่อ> <role>
     case '/add': {
       if (parts.length < 4) return '❌ รูปแบบ:\n/add <userId> <ชื่อ> <role>\nเช่น: /add U578... สมชาย staff';
       const newId   = parts[1].trim();
@@ -166,22 +197,21 @@ function handleAdminCommand(query, adminId, event) {
       const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       for (let i = 1; i < values.length; i++) {
-        if (values[i][1].toString().trim() === newId) return '⚠️ User ID นี้มีในระบบแล้ว';
+        if (values[i][COL_STAFF.UID].toString().trim() === newId) return '⚠️ User ID นี้มีในระบบแล้ว';
       }
       sheet.appendRow([newName, newId, 'active', newRole]);
       clearStaffCache(newId);
       return '✅ เพิ่ม ' + newName + ' (' + newRole + ') สำเร็จ';
     }
 
-    // /remove <userId>
     case '/remove': {
       if (parts.length < 2) return '❌ รูปแบบ:\n/remove <userId>';
       const removeId = parts[1].trim();
       const sheet    = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values   = sheet.getDataRange().getValues();
       for (let i = 1; i < values.length; i++) {
-        if (values[i][1].toString().trim() === removeId) {
-          const name = values[i][0];
+        if (values[i][COL_STAFF.UID].toString().trim() === removeId) {
+          const name = values[i][COL_STAFF.NAME];
           sheet.deleteRow(i + 1);
           clearStaffCache(removeId);
           return '✅ ลบ ' + name + ' ออกจากระบบแล้ว';
@@ -190,7 +220,6 @@ function handleAdminCommand(query, adminId, event) {
       return '❌ ไม่พบ User ID นี้ในระบบ';
     }
 
-    // /setstatus <userId> <active|inactive>
     case '/setstatus': {
       if (parts.length < 3) return '❌ รูปแบบ:\n/setstatus <userId> <active|inactive>';
       const targetId  = parts[1].trim();
@@ -199,16 +228,15 @@ function handleAdminCommand(query, adminId, event) {
       const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       for (let i = 1; i < values.length; i++) {
-        if (values[i][1].toString().trim() === targetId) {
-          sheet.getRange(i + 1, 3).setValue(newStatus);
+        if (values[i][COL_STAFF.UID].toString().trim() === targetId) {
+          sheet.getRange(i + 1, COL_STAFF.STATUS + 1).setValue(newStatus);
           clearStaffCache(targetId);
-          return '✅ เปลี่ยน status ของ ' + values[i][0] + ' เป็น ' + newStatus + ' แล้ว';
+          return '✅ เปลี่ยน status ของ ' + values[i][COL_STAFF.NAME] + ' เป็น ' + newStatus + ' แล้ว';
         }
       }
       return '❌ ไม่พบ User ID นี้ในระบบ';
     }
 
-    // /setrole <userId> <admin|staff>
     case '/setrole': {
       if (parts.length < 3) return '❌ รูปแบบ:\n/setrole <userId> <admin|staff>';
       const targetId = parts[1].trim();
@@ -217,31 +245,29 @@ function handleAdminCommand(query, adminId, event) {
       const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       for (let i = 1; i < values.length; i++) {
-        if (values[i][1].toString().trim() === targetId) {
-          sheet.getRange(i + 1, 4).setValue(newRole);
+        if (values[i][COL_STAFF.UID].toString().trim() === targetId) {
+          sheet.getRange(i + 1, COL_STAFF.ROLE + 1).setValue(newRole);
           clearStaffCache(targetId);
-          return '✅ เปลี่ยน role ของ ' + values[i][0] + ' เป็น ' + newRole + ' แล้ว';
+          return '✅ เปลี่ยน role ของ ' + values[i][COL_STAFF.NAME] + ' เป็น ' + newRole + ' แล้ว';
         }
       }
       return '❌ ไม่พบ User ID นี้ในระบบ';
     }
 
-    // /list
     case '/list': {
       const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       const lines  = ['👥 รายชื่อผู้ใช้งานทั้งหมด\n'];
       for (let i = 1; i < values.length; i++) {
-        if (values[i][0]) {
-          const icon   = values[i][3] === 'admin' ? '👑' : '👤';
-          const status = values[i][2] === 'active' ? '🟢' : '🔴';
-          lines.push(icon + ' ' + values[i][0] + ' (' + values[i][3] + ') ' + status);
+        if (values[i][COL_STAFF.NAME]) {
+          const icon   = values[i][COL_STAFF.ROLE]   === 'admin'  ? '👑' : '👤';
+          const status = values[i][COL_STAFF.STATUS] === 'active' ? '🟢' : '🔴';
+          lines.push(icon + ' ' + values[i][COL_STAFF.NAME] + ' (' + values[i][COL_STAFF.ROLE] + ') ' + status);
         }
       }
       return lines.join('\n');
     }
 
-    // /status <userId>
     case '/status': {
       if (parts.length < 2) return '❌ รูปแบบ:\n/status <userId>';
       const checkId     = parts[1].trim();
@@ -250,22 +276,20 @@ function handleAdminCommand(query, adminId, event) {
       return '📋 ' + targetStaff.name + '\nRole: ' + targetStaff.role + '\nStatus: active';
     }
 
-    // /whois
     case '/whois': {
       const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       const lines  = ['👥 รายชื่อที่มีสิทธิ์ในระบบ\n'];
       for (let i = 1; i < values.length; i++) {
-        if (values[i][0]) {
-          const icon   = values[i][3] === 'admin' ? '👑' : '👤';
-          const status = values[i][2] === 'active' ? '🟢' : '🔴';
-          lines.push(icon + ' ' + values[i][0] + '\n    ' + status + ' ' + values[i][3] + '\n    ' + values[i][1]);
+        if (values[i][COL_STAFF.NAME]) {
+          const icon   = values[i][COL_STAFF.ROLE]   === 'admin'  ? '👑' : '👤';
+          const status = values[i][COL_STAFF.STATUS] === 'active' ? '🟢' : '🔴';
+          lines.push(icon + ' ' + values[i][COL_STAFF.NAME] + '\n    ' + status + ' ' + values[i][COL_STAFF.ROLE] + '\n    ' + values[i][COL_STAFF.UID]);
         }
       }
       return lines.join('\n');
     }
 
-    // /visitors
     case '/visitors': {
       const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Visitors');
       if (!sheet) return '❌ ไม่พบ Sheet Visitors';
@@ -274,9 +298,9 @@ function handleAdminCommand(query, adminId, event) {
       if (dataRows.length === 0) return '📋 ยังไม่มีข้อมูล';
       const lines = ['👥 คนที่เคยพิมพ์ในระบบ ' + dataRows.length + ' คน\n'];
       dataRows.forEach(row => {
-        const uid      = row[0] || '-';
-        const name     = row[1] || '-';
-        const lastSeen = row[2] ? Utilities.formatDate(new Date(row[2]), 'Asia/Bangkok', 'dd/MM HH:mm') : '-';
+        const uid      = row[COL_VISITOR.UID]         || '-';
+        const name     = row[COL_VISITOR.DISPLAYNAME] || '-';
+        const lastSeen = row[COL_VISITOR.LAST_SEEN] ? Utilities.formatDate(new Date(row[COL_VISITOR.LAST_SEEN]), 'Asia/Bangkok', 'dd/MM HH:mm') : '-';
         const s        = getStaff(uid);
         const icon     = s ? '✅' : '❓';
         lines.push(icon + ' ' + name + '\n    ' + uid + '\n    last: ' + lastSeen);
@@ -284,7 +308,6 @@ function handleAdminCommand(query, adminId, event) {
       return lines.join('\n');
     }
 
-    // /log <จำนวน>
     case '/log': {
       const limit    = Math.min(parts[1] ? parseInt(parts[1]) : 5, 20);
       const sheet    = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Log');
@@ -294,26 +317,25 @@ function handleAdminCommand(query, adminId, event) {
       const lastRows = dataRows.slice(-limit).reverse();
       const lines    = ['📋 Log ' + limit + ' รายการล่าสุด\n'];
       lastRows.forEach(row => {
-        const time = row[0] ? Utilities.formatDate(new Date(row[0]), 'Asia/Bangkok', 'dd/MM HH:mm') : '-';
-        const name = row[2] || row[1] || '-';
-        const q    = row[4] || '-';
-        const res  = row[5] || '-';
+        const time = row[COL_LOG.TIMESTAMP] ? Utilities.formatDate(new Date(row[COL_LOG.TIMESTAMP]), 'Asia/Bangkok', 'dd/MM HH:mm') : '-';
+        const name = row[COL_LOG.STAFF_NAME] || row[COL_LOG.UID] || '-';
+        const q    = row[COL_LOG.QUERY]  || '-';
+        const res  = row[COL_LOG.RESULT] || '-';
         const icon = res === 'พบข้อมูล' ? '✅' : '❌';
         lines.push(icon + ' ' + time + ' | ' + name + '\n    🔍 ' + q);
       });
       return lines.join('\n');
     }
 
-    // /clearcache
     case '/clearcache': {
       const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
       const values = sheet.getDataRange().getValues();
       const keys   = ['vehicles'];
       for (let i = 1; i < values.length; i++) {
-        if (values[i][1]) {
-          keys.push('staff_'   + values[i][1].toString().trim());
-          keys.push('name_'    + values[i][1].toString().trim());
-          keys.push('tracked_' + values[i][1].toString().trim());
+        if (values[i][COL_STAFF.UID]) {
+          keys.push('staff_'   + values[i][COL_STAFF.UID].toString().trim());
+          keys.push('name_'    + values[i][COL_STAFF.UID].toString().trim());
+          keys.push('tracked_' + values[i][COL_STAFF.UID].toString().trim());
         }
       }
       CacheService.getScriptCache().removeAll(keys);
@@ -328,21 +350,22 @@ function handleAdminCommand(query, adminId, event) {
 // ============================
 // 4. SEARCH ENGINE
 // ============================
+
 function searchByPlate(query) {
   const data = getCachedSheetData('Vehicles');
   const q    = query.replace(/\s/g, '').toLowerCase();
 
   const matches = data.slice(1).filter(row =>
-    row[0].toString().replace(/\s/g, '').toLowerCase().includes(q)
+    row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '').toLowerCase().includes(q)
   );
 
   if (matches.length === 0) return { found: false, message: '❌ ไม่พบทะเบียนนี้ในระบบ\nกรุณาแลกบัตรตามขั้นตอนปกติ' };
 
   const msg = matches.map(row =>
-    '🚗 ' + row[0] + '\n' +
-    '    ' + row[1] + ' ' + row[2] + ' | สี' + row[3] + '\n' +
-    '🏠 บ้านเลขที่: ' + row[4] + '\n' +
-    getStatusLabel(row[6])
+    '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
+    '    ' + row[COL_VEHICLE.BRAND] + ' ' + row[COL_VEHICLE.MODEL] + ' | สี' + row[COL_VEHICLE.COLOR] + '\n' +
+    '🏠 บ้านเลขที่: ' + row[COL_VEHICLE.HOUSE] + '\n' +
+    getStatusLabel(row[COL_VEHICLE.STATUS])
   ).join('\n\n');
 
   const header = matches.length > 1
@@ -357,7 +380,7 @@ function searchByHouse(query) {
   const q    = query.trim();
 
   const matches = data.slice(1).filter(row => {
-    const house = row[4].toString().trim();
+    const house = row[COL_VEHICLE.HOUSE].toString().trim();
     if (house === q) return true;
     if (house.includes('-') && q.includes('/')) {
       const [prefix, range]    = house.split('/');
@@ -371,9 +394,9 @@ function searchByHouse(query) {
   if (matches.length === 0) return { found: false, message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ' };
 
   const msg = matches.map(row =>
-    '🚗 ' + row[0] + '\n' +
-    '    ' + row[1] + ' ' + row[2] + ' | สี' + row[3] + '\n' +
-    getStatusLabel(row[6])
+    '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
+    '    ' + row[COL_VEHICLE.BRAND] + ' ' + row[COL_VEHICLE.MODEL] + ' | สี' + row[COL_VEHICLE.COLOR] + '\n' +
+    getStatusLabel(row[COL_VEHICLE.STATUS])
   ).join('\n\n');
 
   return { found: true, message: '🏠 บ้านเลขที่ ' + q + ' พบรถ ' + matches.length + ' คัน\n\n' + msg };
@@ -394,18 +417,22 @@ function getCachedSheetData(sheetName) {
 
 function getStaff(userId) {
   if (!userId) return null;
+
   const cache  = CacheService.getScriptCache();
   const cached = cache.get('staff_' + userId);
   if (cached) return JSON.parse(cached);
 
   const data = getCachedSheetData('Staff');
   const row  = data.find(r =>
-    r[1].toString().trim() === userId &&
-    r[2].toString().trim().toLowerCase() === 'active'
+    r[COL_STAFF.UID].toString().trim() === userId &&
+    r[COL_STAFF.STATUS].toString().trim().toLowerCase() === 'active'
   );
 
   if (row) {
-    const staff = { name: row[0], role: row[3].toString().toLowerCase() };
+    const staff = {
+      name: row[COL_STAFF.NAME],
+      role: row[COL_STAFF.ROLE].toString().toLowerCase()
+    };
     cache.put('staff_' + userId, JSON.stringify(staff), CACHE_TIME);
     return staff;
   }
@@ -432,14 +459,14 @@ function trackUser(userId, displayName) {
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Visitors');
   if (!sheet) return;
   const data  = sheet.getDataRange().getValues();
-  const index = data.findIndex(row => row[0] === userId);
+  const index = data.findIndex(row => row[COL_VISITOR.UID] === userId);
   if (index !== -1) {
-    sheet.getRange(index + 1, 3).setValue(new Date());
+    sheet.getRange(index + 1, COL_VISITOR.LAST_SEEN + 1).setValue(new Date());
   } else {
     sheet.appendRow([userId, displayName, new Date()]);
   }
 
-  cache.put(cacheKey, '1', 3600); // 1 ชั่วโมง
+  cache.put(cacheKey, '1', 3600);
 }
 
 function writeLog(uid, sName, lName, q, res) {
@@ -521,7 +548,7 @@ function dailyCleanup() {
     const sheet = ss.getSheetByName(name);
     if (!sheet) return;
     const data    = sheet.getDataRange().getValues();
-    const dateIdx = name === 'Log' ? 0 : 2;
+    const dateIdx = name === 'Log' ? COL_LOG.TIMESTAMP : COL_VISITOR.LAST_SEEN;
     const cutoff  = new Date();
     cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
     const toKeep = data.filter((row, i) => i === 0 || new Date(row[dateIdx]) >= cutoff);
