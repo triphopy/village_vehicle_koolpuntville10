@@ -133,6 +133,9 @@ function isSufficientPlateQuery(query) {
   const compact = compactPlateText(query);
   if (!compact) return false;
   if (/^\d{4}$/.test(compact)) return true;
+  if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(compact)) return true;
+  if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(compact)) return true;
+  if (/^\d{1,2}-?\d{4}$/.test((query || '').toString().trim())) return true;
   if (compact.length >= 5) return true;
   return false;
 }
