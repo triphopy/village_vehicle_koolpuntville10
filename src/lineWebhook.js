@@ -26,6 +26,15 @@ const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
 // ============================
 function doPost(e) {
   try {
+
+    debugToLine(JSON.stringify(e, null, 2));
+    
+    const signature = e.parameter['X-Line-Signature'] 
+                   || e.postData.headers?.['X-Line-Signature'];
+    if (!signature || !verifySignature(e.postData.contents, signature)) {
+      return ContentService.createTextOutput('Unauthorized');
+    }
+
     const data = JSON.parse(e.postData.contents);
     if (!data.events) return;
 
@@ -577,4 +586,27 @@ function onEdit(e) {
     cache.remove('vehicles');
     console.log('Auto-cleared vehicle cache due to manual edit');
   }
+}
+
+function verifySignature(rawBody, signature) {
+  const hash = Utilities.computeHmacSha256Signature(rawBody, LINE_CHANNEL_SECRET);
+  const hashBase64 = Utilities.base64Encode(hash);
+  return hashBase64 === signature;
+}
+
+function debugToLine(msg) {
+  if (props.getProperty('DEBUG_MODE') !== 'true') return; // ปิดอยู่ก็ไม่ทำงาน
+  const ADMIN_UID = props.getProperty('ADMIN_UID');
+  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN
+    },
+    payload: JSON.stringify({
+      to: ADMIN_UID,
+      messages: [{ type: 'text', text: '🔍 DEBUG\n' + msg.substring(0, 4900) }]
+    }),
+    muteHttpExceptions: true
+  });
 }
