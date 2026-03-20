@@ -607,7 +607,7 @@ function onEdit(e) {
   if (sheetName === 'Staff') {
     const row = range.getRow();
     if (row <= 1) return;
-    const userId = sheet.getRange(row, 2).getValue();
+    const userId = sheet.getRange(row, COL_STAFF.UID + 1).getValue();
     if (userId) {
       cache.remove('staff_' + userId); // cache รายคน
       cache.remove('staff_list');       // cache รายชื่อ
