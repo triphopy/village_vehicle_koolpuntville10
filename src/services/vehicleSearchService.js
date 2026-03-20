@@ -1,9 +1,9 @@
 function searchByPlate(query) {
   const data = getCachedSheetData('Vehicles');
-  const q = query.replace(/\s/g, '').toLowerCase();
+  const q = compactPlateText(query).toLowerCase();
 
   const matches = data.slice(1).filter(row =>
-    row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '').toLowerCase().includes(q)
+    compactPlateText(row[COL_VEHICLE.PLATE]).toLowerCase().includes(q)
   );
 
   if (matches.length === 0) {
@@ -70,7 +70,7 @@ function searchByHouse(query) {
 }
 
 function getSuggestedPlateMatches(query) {
-  const target = (query || '').replace(/[\s\-]/g, '');
+  const target = compactPlateText(query);
   if (!target) return [];
 
   const candidateMap = buildPlateCandidateMap();
@@ -82,7 +82,7 @@ function getSuggestedPlateMatches(query) {
   const normalizedTarget = normalizePlateForComparison(target);
   const fuzzySuggestions = data.slice(1)
     .map(row => {
-      const plate = row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '');
+      const plate = compactPlateText(row[COL_VEHICLE.PLATE]);
       return {
         plate: plate,
         score: stringSimilarity(normalizedTarget, normalizePlateForComparison(plate))

@@ -98,6 +98,10 @@ function cleanPlateText(rawText) {
   return extracted ? extracted[0] : null;
 }
 
+function compactPlateText(text) {
+  return (text || '').toString().replace(/[\s\-]/g, '');
+}
+
 function fuzzySearchPlate(ocrText) {
   if (!ocrText) return null;
 
@@ -135,19 +139,19 @@ function resolvePlateFromOcr(ocrText) {
 }
 
 function findExactPlateMatch(text) {
-  const target = (text || '').replace(/\s/g, '');
+  const target = compactPlateText(text);
   if (!target) return null;
 
   const data = getCachedSheetData('Vehicles');
   const match = data.slice(1).find(row =>
-    row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '') === target
+    compactPlateText(row[COL_VEHICLE.PLATE]) === target
   );
 
-  return match ? match[COL_VEHICLE.PLATE].toString().replace(/\s/g, '') : null;
+  return match ? compactPlateText(match[COL_VEHICLE.PLATE]) : null;
 }
 
 function findPlateByGeneratedCandidates(ocrText) {
-  const target = (ocrText || '').replace(/\s/g, '');
+  const target = compactPlateText(ocrText);
   if (!target) return null;
 
   const candidateMap = buildPlateCandidateMap();
@@ -165,7 +169,7 @@ function buildPlateCandidateMap() {
   const map = {};
 
   data.slice(1).forEach(row => {
-    const plate = row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '');
+    const plate = compactPlateText(row[COL_VEHICLE.PLATE]);
     if (plate) map[plate] = plate;
   });
 
@@ -232,7 +236,7 @@ function getPlateConfusionMap() {
 function normalizePlateForComparison(text) {
   if (!text) return '';
 
-  const compact = text.replace(/[\s\-]/g, '');
+  const compact = compactPlateText(text);
   const confusionGroups = [
     ['ฮ', 'อ', 'ฬ'],
     ['ข', 'ช'],
