@@ -27,13 +27,13 @@ const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
 function doPost(e) {
   try {
 
-    debugToLine(JSON.stringify(e, null, 2));
-    
-    const signature = e.parameter['X-Line-Signature'] 
-                   || e.postData.headers?.['X-Line-Signature'];
-    if (!signature || !verifySignature(e.postData.contents, signature)) {
+    const token = e.parameter.token;
+    if (token !== props.getProperty('WEBHOOK_SECRET')) {
       return ContentService.createTextOutput('Unauthorized');
     }
+
+    debugToLine(JSON.stringify(e, null, 2));
+
 
     const data = JSON.parse(e.postData.contents);
     if (!data.events) return;
@@ -586,12 +586,6 @@ function onEdit(e) {
     cache.remove('vehicles');
     console.log('Auto-cleared vehicle cache due to manual edit');
   }
-}
-
-function verifySignature(rawBody, signature) {
-  const hash = Utilities.computeHmacSha256Signature(rawBody, LINE_CHANNEL_SECRET);
-  const hashBase64 = Utilities.base64Encode(hash);
-  return hashBase64 === signature;
 }
 
 function debugToLine(msg) {
