@@ -37,21 +37,27 @@ function handleImageMessage(context) {
     return;
   }
 
-  const correctedPlate = resolvePlateFromOcr(plateText);
-  const result = searchByPlate(correctedPlate || plateText);
-  const warningNote = correctedPlate && correctedPlate !== plateText
+  const hintedPlate = resolvePlateFromOcr(plateText);
+  const forcedSuggestions = hintedPlate && compactPlateText(hintedPlate) !== compactPlateText(plateText)
+    ? [hintedPlate]
+    : [];
+  const result = searchByPlateDetailed(plateText, {
+    source: 'ocr',
+    forcedSuggestions: forcedSuggestions
+  });
+  const hasHint = forcedSuggestions.length > 0 && !result.found;
+  const warningNote = hasHint
     ? '⚠️ กรุณาตรวจป้ายอีกครั้งก่อนอนุญาต\n\n'
     : '';
-  const ocrNote = correctedPlate && correctedPlate !== plateText
-    ? '🔍 อ่านจากรูปได้: ' + plateText + '\n📝 ตรวจในระบบแล้ว: ' + correctedPlate + '\n\n'
-    : '🔍 อ่านจากรูปได้: ' + plateText + '\n\n';
+  const ocrNote = '🔍 อ่านจากรูปได้: ' + plateText + '\n\n';
 
   writeLog(
     userId,
     staff.name,
     lineName,
-    '[OCR] ' + (correctedPlate || plateText),
-    result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล'
+    '[OCR] ' + plateText + (hasHint ? ' -> ' + forcedSuggestions[0] : ''),
+    result.logResult || (result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล')
   );
+
   replyToLine(replyToken, ocrNote + warningNote + result.message);
 }

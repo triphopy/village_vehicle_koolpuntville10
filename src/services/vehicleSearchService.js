@@ -1,39 +1,79 @@
-function searchByPlate(query) {
-  const data = getCachedSheetData('Vehicles');
-  const q = query.replace(/\s/g, '').toLowerCase();
+function searchByPlate(query, options) {
+  return searchByPlateDetailed(query, options);
+}
 
-  const matches = data.slice(1).filter(function (row) {
-    return row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '').toLowerCase().includes(q);
-  });
+function searchByPlateDetailed(query, options) {
+  const opts = options || {};
+  const source = opts.source || 'text';
+  const forcedSuggestions = opts.forcedSuggestions || [];
+  const normalizedQuery = normalizePlateSearchText(query);
 
-  if (matches.length === 0) {
+  if (!normalizedQuery) {
     return {
       found: false,
-      message: '❌ ไม่พบข้อมูลรถในระบบ\nผลตรวจ: ให้แลกบัตร'
+      message: source === 'ocr'
+        ? '❌ ไม่พบข้อมูลตรงตัวในระบบ\nผลตรวจ: ให้แลกบัตร'
+        : '❌ ไม่พบข้อมูลรถในระบบ\nผลตรวจ: ให้แลกบัตร',
+      logResult: 'ไม่พบข้อมูล'
     };
   }
 
-  const msg = matches.map(function (row) {
-    return '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
-      row[COL_VEHICLE.BRAND] + ' ' + row[COL_VEHICLE.MODEL] + ' | สี' + row[COL_VEHICLE.COLOR] + '\n' +
-      '🏠 บ้านเลขที่: ' + row[COL_VEHICLE.HOUSE] + '\n' +
-      getStatusLabel(row[COL_VEHICLE.STATUS]) + '\n' +
-      getDecisionLabel(row[COL_VEHICLE.STATUS]);
-  }).join('\n\n');
+  const data = getCachedSheetData('Vehicles');
+  const matches = data.slice(1).filter(function (row) {
+    return normalizePlateSearchText(row[COL_VEHICLE.PLATE]).includes(normalizedQuery);
+  });
 
-  const header = matches.length > 1
-    ? '⚠️ พบหลายคัน กรุณาตรวจทะเบียนให้ตรงอีกครั้ง\n✅ พบข้อมูล ' + matches.length + ' รายการ\n\n'
-    : '✅ พบข้อมูลในระบบ\n\n';
+  if (matches.length === 0) {
+    const suggestions = findSuggestedPlates(query, forcedSuggestions, 3);
+    if (suggestions.length > 0) {
+      const lines = [
+        source === 'ocr' ? '❌ ไม่พบข้อมูลตรงตัวในระบบ' : '❌ ไม่พบข้อมูลรถในระบบ',
+        '',
+        'ใกล้เคียงที่อาจเป็น:',
+        suggestions.map(function (plate) { return '• ' + plate; }).join('\n'),
+        source === 'ocr'
+          ? 'ผลตรวจ: กรุณาตรวจป้ายอีกครั้ง'
+          : 'ผลตรวจ: กรุณาตรวจทะเบียนอีกครั้ง'
+      ];
 
-  return { found: true, message: header + msg };
+      return {
+        found: false,
+        message: lines.join('\n'),
+        logResult: source === 'ocr' ? 'ไม่พบข้อมูล (มีเลขใกล้เคียงจาก OCR)' : 'ไม่พบข้อมูล (มีเลขใกล้เคียง)'
+      };
+    }
+
+    return {
+      found: false,
+      message: source === 'ocr'
+        ? '❌ ไม่พบข้อมูลตรงตัวในระบบ\nผลตรวจ: ให้แลกบัตร'
+        : '❌ ไม่พบข้อมูลรถในระบบ\nผลตรวจ: ให้แลกบัตร',
+      logResult: 'ไม่พบข้อมูล'
+    };
+  }
+
+  const message = buildPlateMatchMessage(matches);
+  const statuses = matches.map(function (row) {
+    return ((row[COL_VEHICLE.STATUS] || '') + '').toLowerCase() || 'unknown';
+  });
+
+  return {
+    found: true,
+    message: message,
+    logResult: buildPlateLogResult(statuses)
+  };
 }
 
 function searchByHouse(query) {
+  return searchByHouseDetailed(query);
+}
+
+function searchByHouseDetailed(query) {
+  const q = (query || '').toString().trim();
   const data = getCachedSheetData('Vehicles');
-  const q = query.trim();
 
   const matches = data.slice(1).filter(function (row) {
-    const house = row[COL_VEHICLE.HOUSE].toString().trim();
+    const house = ((row[COL_VEHICLE.HOUSE] || '') + '').trim();
     if (house === q) return true;
     if (house.includes('-') && q.includes('/')) {
       const houseParts = house.split('/');
@@ -51,21 +91,118 @@ function searchByHouse(query) {
   if (matches.length === 0) {
     return {
       found: false,
-      message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ'
+      message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ',
+      logResult: 'ค้นบ้านเลขที่: ไม่พบข้อมูล'
     };
   }
 
   const msg = matches.map(function (row) {
     return '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
-      row[COL_VEHICLE.BRAND] + ' ' + row[COL_VEHICLE.MODEL] + ' | สี' + row[COL_VEHICLE.COLOR] + '\n' +
+      formatVehicleLine(row) + '\n' +
       getStatusLabel(row[COL_VEHICLE.STATUS]);
   }).join('\n\n');
 
-  return { found: true, message: '🏠 บ้านเลขที่ ' + q + ' พบรถ ' + matches.length + ' คัน\n\n' + msg };
+  return {
+    found: true,
+    message: '🏠 บ้านเลขที่ ' + q + ' พบรถ ' + matches.length + ' คัน\n\n' + msg,
+    logResult: 'ค้นบ้านเลขที่: พบ ' + matches.length + ' คัน'
+  };
+}
+
+function buildPlateMatchMessage(matches) {
+  const msg = matches.map(function (row) {
+    return '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
+      formatVehicleLine(row) + '\n' +
+      '🏠 บ้านเลขที่: ' + row[COL_VEHICLE.HOUSE] + '\n' +
+      getStatusLabel(row[COL_VEHICLE.STATUS]) + '\n' +
+      getDecisionLabel(row[COL_VEHICLE.STATUS]);
+  }).join('\n\n');
+
+  const header = matches.length > 1
+    ? '⚠️ พบหลายคัน กรุณาตรวจทะเบียนให้ตรงอีกครั้ง\n✅ พบข้อมูล ' + matches.length + ' รายการ\n\n'
+    : '✅ พบข้อมูลในระบบ\n\n';
+
+  return header + msg;
+}
+
+function formatVehicleLine(row) {
+  const brand = ((row[COL_VEHICLE.BRAND] || '') + '').trim();
+  const model = ((row[COL_VEHICLE.MODEL] || '') + '').trim();
+  const color = ((row[COL_VEHICLE.COLOR] || '') + '').trim();
+
+  if (brand && model) return brand + ' ' + model + ' | สี' + color;
+  if (brand) return brand + ' | สี' + color;
+  return 'สี' + color;
+}
+
+function findSuggestedPlates(query, forcedSuggestions, limit) {
+  const maxItems = limit || 3;
+  const data = getCachedSheetData('Vehicles');
+  const queryCompact = compactPlateText(query).toUpperCase();
+  const queryNormalized = normalizePlateForComparison(queryCompact);
+  const unique = {};
+  const suggestions = [];
+
+  function pushSuggestion(plate) {
+    if (!plate) return;
+    const key = compactPlateText(plate).toUpperCase();
+    if (!key || unique[key]) return;
+    unique[key] = true;
+    suggestions.push(plate);
+  }
+
+  forcedSuggestions.forEach(pushSuggestion);
+
+  data.slice(1).forEach(function (row) {
+    const plate = compactPlateText(row[COL_VEHICLE.PLATE]).toUpperCase();
+    if (!plate) return;
+    if (plate === queryCompact) return;
+    if (queryCompact && plate.indexOf(queryCompact) !== -1) {
+      pushSuggestion(plate);
+    }
+  });
+
+  const scored = data.slice(1).map(function (row) {
+    const plate = compactPlateText(row[COL_VEHICLE.PLATE]).toUpperCase();
+    return {
+      plate: plate,
+      score: stringSimilarity(queryNormalized, normalizePlateForComparison(plate))
+    };
+  }).filter(function (item) {
+    return item.plate && item.plate !== queryCompact && item.score >= 0.75;
+  }).sort(function (a, b) {
+    return b.score - a.score;
+  });
+
+  scored.forEach(function (item) {
+    pushSuggestion(item.plate);
+  });
+
+  return suggestions.slice(0, maxItems);
+}
+
+function buildPlateLogResult(statuses) {
+  const counts = {};
+  statuses.forEach(function (status) {
+    counts[status] = (counts[status] || 0) + 1;
+  });
+
+  const keys = Object.keys(counts);
+  if (keys.length === 1 && statuses.length === 1) {
+    return 'พบข้อมูล: ' + keys[0];
+  }
+
+  return 'พบข้อมูล ' + statuses.length + ' รายการ: ' + keys.join(', ');
+}
+
+function normalizePlateSearchText(text) {
+  return ((text || '') + '')
+    .replace(/[\s\-]/g, '')
+    .toLowerCase();
 }
 
 function getStatusLabel(status) {
-  const s = (status || '').toString().toLowerCase();
+  const s = ((status || '') + '').toLowerCase();
   if (s === 'active') return '✅ สถานะ: อนุญาต';
   if (s === 'inactive') return '⛔ สถานะ: ไม่อนุญาต';
   if (s === 'blacklist') return '🚨 สถานะ: Blacklist';
@@ -73,7 +210,7 @@ function getStatusLabel(status) {
 }
 
 function getDecisionLabel(status) {
-  const s = (status || '').toString().toLowerCase();
+  const s = ((status || '') + '').toLowerCase();
   if (s === 'active') return 'ผลตรวจ: เข้าได้';
   if (s === 'inactive') return 'ผลตรวจ: ไม่อนุญาต';
   if (s === 'blacklist') return 'ผลตรวจ: ห้ามเข้า';
