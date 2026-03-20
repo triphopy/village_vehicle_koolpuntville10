@@ -15,7 +15,7 @@ function searchByPlate(query) {
 
   const msg = matches.map(row =>
     '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
-    '    ' + row[COL_VEHICLE.BRAND] + ' ' + row[COL_VEHICLE.MODEL] + ' | สี' + row[COL_VEHICLE.COLOR] + '\n' +
+    row[COL_VEHICLE.BRAND] + ' ' + row[COL_VEHICLE.MODEL] + ' | สี' + row[COL_VEHICLE.COLOR] + '\n' +
     '🏠 บ้านเลขที่: ' + row[COL_VEHICLE.HOUSE] + '\n' +
     getStatusLabel(row[COL_VEHICLE.STATUS]) + '\n' +
     getDecisionLabel(row[COL_VEHICLE.STATUS])
@@ -57,7 +57,7 @@ function searchByHouse(query) {
 
   const msg = matches.map(row =>
     '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
-    '    ' + row[COL_VEHICLE.BRAND] + ' ' + row[COL_VEHICLE.MODEL] + ' | สี' + row[COL_VEHICLE.COLOR] + '\n' +
+    row[COL_VEHICLE.BRAND] + ' ' + row[COL_VEHICLE.MODEL] + ' | สี' + row[COL_VEHICLE.COLOR] + '\n' +
     getStatusLabel(row[COL_VEHICLE.STATUS])
   ).join('\n\n');
 
