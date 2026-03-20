@@ -20,7 +20,7 @@ function parseWebhookRequest(e) {
     };
   }
 
-  debugToLine(JSON.stringify(e, null, 2));
+  //debugToLine(JSON.stringify(e, null, 2));
 
   if (!e || !e.postData || !e.postData.contents) {
     return {

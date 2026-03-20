@@ -1,58 +1,58 @@
 /**
- * 🏢 Vehicle Verification System (Group Event + UID Tracking + OCR)
+ * Vehicle Verification System (Group Event + UID Tracking + OCR)
  * เพิ่ม: OCR ด้วย Gemini 2.5 Flash-Lite + Fuzzy Match
  */
 
 // ============================
 // 1. CONFIGURATION
 // ============================
-const props               = PropertiesService.getScriptProperties();
-const LINE_ACCESS_TOKEN   = props.getProperty('LINE_ACCESS_TOKEN');
+const props = PropertiesService.getScriptProperties();
+const LINE_ACCESS_TOKEN = props.getProperty('LINE_ACCESS_TOKEN');
 const LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
-const GEMINI_API_KEY      = props.getProperty('GEMINI_API_KEY');       // 🆕 เพิ่มใน Script Properties
-const RETENTION_DAYS      = Number(props.getProperty('LOG_RETENTION_DAYS')) || 30;
-const BACKUPRETENTION_DAYS      = Number(props.getProperty('BACKUP_RETENTION_DAYS')) || 30;
+const GEMINI_API_KEY = props.getProperty('GEMINI_API_KEY');
+const RETENTION_DAYS = Number(props.getProperty('LOG_RETENTION_DAYS')) || 30;
+const BACKUPRETENTION_DAYS = Number(props.getProperty('BACKUP_RETENTION_DAYS')) || 30;
 
-const CACHE_TIME          = 3600;
-const BACKUP_FOLDER_NAME  = props.getProperty('BACKUP_FOLDER_NAME');
-const SPREADSHEET_ID      = props.getProperty('SPREADSHEET_ID');
+const CACHE_TIME = 3600;
+const BACKUP_FOLDER_NAME = props.getProperty('BACKUP_FOLDER_NAME');
+const SPREADSHEET_ID = props.getProperty('SPREADSHEET_ID');
 
 const COL_VEHICLE = {
-  PLATE  : 0,
-  BRAND  : 1,
-  MODEL  : 2,
-  COLOR  : 3,
-  HOUSE  : 4,
-  OWNER  : 5,
-  STATUS : 6
+  PLATE: 0,
+  BRAND: 1,
+  MODEL: 2,
+  COLOR: 3,
+  HOUSE: 4,
+  OWNER: 5,
+  STATUS: 6
 };
 
 const COL_STAFF = {
-  NAME   : 0,
-  UID    : 1,
-  STATUS : 2,
-  ROLE   : 3
+  NAME: 0,
+  UID: 1,
+  STATUS: 2,
+  ROLE: 3
 };
 
 const COL_VISITOR = {
-  UID         : 0,
-  DISPLAYNAME : 1,
-  LAST_SEEN   : 2
+  UID: 0,
+  DISPLAYNAME: 1,
+  LAST_SEEN: 2
 };
 
 const COL_LOG = {
-  TIMESTAMP : 0,
-  UID       : 1,
+  TIMESTAMP: 0,
+  UID: 1,
   STAFF_NAME: 2,
-  LINE_NAME : 3,
-  QUERY     : 4,
-  RESULT    : 5
+  LINE_NAME: 3,
+  QUERY: 4,
+  RESULT: 5
 };
 
 const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
   .split(',')
-  .map(id => id.trim())
-  .filter(id => id);
+  .map(function (id) { return id.trim(); })
+  .filter(function (id) { return id; });
 
 let LAST_OCR_STATUS = 'idle';
 
@@ -76,10 +76,10 @@ let LAST_OCR_STATUS = 'idle';
 // Scheduled maintenance moved to src/services/maintenanceService.js
 
 function onEdit(e) {
-  const range     = e.range;
-  const sheet     = range.getSheet();
+  const range = e.range;
+  const sheet = range.getSheet();
   const sheetName = sheet.getName();
-  const cache     = CacheService.getScriptCache();
+  const cache = CacheService.getScriptCache();
 
   if (sheetName === 'Staff') {
     const row = range.getRow();
@@ -102,18 +102,28 @@ function onEdit(e) {
 
 function debugToLine(msg) {
   if (props.getProperty('DEBUG_MODE') !== 'true') return;
-  const ADMIN_UID = props.getProperty('ADMIN_UID');
-  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
-    method: 'post',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN
-    },
-    payload: JSON.stringify({
-      to: ADMIN_UID,
-      messages: [{ type: 'text', text: '🔍 DEBUG\n' + msg.substring(0, 4900) }]
-    }),
-    muteHttpExceptions: true
+
+  const adminUids = (props.getProperty('ADMIN_UID') || '')
+    .split(',')
+    .map(function (id) { return id.trim(); })
+    .filter(function (id) { return id; });
+
+  adminUids.forEach(function (adminUid) {
+    const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN
+      },
+      payload: JSON.stringify({
+        to: adminUid,
+        messages: [{ type: 'text', text: '[DEBUG]\n' + msg.substring(0, 4900) }]
+      }),
+      muteHttpExceptions: true
+    });
+
+    if (response.getResponseCode() >= 300) {
+      console.error('debugToLine push failed for ' + adminUid + ': ' + response.getContentText());
+    }
   });
 }
-
