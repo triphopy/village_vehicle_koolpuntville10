@@ -7,9 +7,14 @@ function searchByPlate(query) {
   );
 
   if (matches.length === 0) {
+    const suggestions = getSuggestedPlateMatches(query);
+    const suggestionText = suggestions.length > 0
+      ? '\n\nใกล้เคียงที่อาจเป็น:\n• ' + suggestions.join('\n• ') + '\nผลตรวจ: กรุณาตรวจทะเบียนอีกครั้ง'
+      : '\nผลตรวจ: ให้แลกบัตร';
+
     return {
       found: false,
-      message: '❌ ไม่พบข้อมูลรถในระบบ\nผลตรวจ: ให้แลกบัตร'
+      message: '❌ ไม่พบข้อมูลรถในระบบ' + suggestionText
     };
   }
 
@@ -62,6 +67,31 @@ function searchByHouse(query) {
   ).join('\n\n');
 
   return { found: true, message: '🏠 บ้านเลขที่ ' + q + ' พบรถ ' + matches.length + ' คัน\n\n' + msg };
+}
+
+function getSuggestedPlateMatches(query) {
+  const target = (query || '').replace(/[\s\-]/g, '');
+  if (!target) return [];
+
+  const data = getCachedSheetData('Vehicles');
+  const normalizedTarget = normalizePlateForComparison(target);
+  const suggestions = data.slice(1)
+    .map(row => {
+      const plate = row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '');
+      return {
+        plate: plate,
+        score: stringSimilarity(normalizedTarget, normalizePlateForComparison(plate))
+      };
+    })
+    .filter(item => item.plate && item.score >= 0.75)
+    .sort((a, b) => b.score - a.score)
+    .filter((item, index, arr) =>
+      arr.findIndex(function (candidate) { return candidate.plate === item.plate; }) === index
+    )
+    .slice(0, 3)
+    .map(item => item.plate);
+
+  return suggestions;
 }
 
 function getStatusLabel(status) {
