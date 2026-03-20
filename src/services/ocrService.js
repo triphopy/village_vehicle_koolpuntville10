@@ -22,62 +22,103 @@ function extractPlateFromImage(imageId) {
 
     const imageBlob = imageResponse.getBlob();
     const base64 = Utilities.base64Encode(imageBlob.getBytes());
+    const mimeType = imageBlob.getContentType() || 'image/jpeg';
+    const firstPass = callGeminiPlateOcr(base64, mimeType, buildPrimaryOcrPrompt(), 30);
+    if (!firstPass) return null;
 
-    const response = UrlFetchApp.fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY,
-      {
-        method: 'post',
-        contentType: 'application/json',
-        muteHttpExceptions: true,
-        payload: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                inline_data: {
-                  mime_type: imageBlob.getContentType() || 'image/jpeg',
-                  data: base64
-                }
-              },
-              {
-                text: 'ดูภาพนี้แล้วอ่านเฉพาะเลขทะเบียนรถที่เห็นในภาพ\n' +
-                      'ตอบเฉพาะตัวอักษรและตัวเลขของทะเบียนเท่านั้น โดยไม่ต้องใส่ช่องว่าง\n' +
-                      'ทะเบียนอาจเป็นรูปแบบเช่น "กข1234", "งล441", "3ขฮ8777", "1กข2345", หรือ "80-1234"\n' +
-                      'ถ้ามีหลายป้าย ให้ตอบเฉพาะป้ายที่เห็นชัดที่สุดเพียงป้ายเดียว\n' +
-                      'ถ้าอ่านไม่ชัดหรือไม่มั่นใจ ให้ตอบ "null"\n' +
-                      'ห้ามเดา ห้ามอธิบาย ห้ามใส่ข้อความอื่นใด'
-              }
-            ]
-          }],
-          generationConfig: {
-            temperature: 0,
-            maxOutputTokens: 30
-          }
-        })
-      }
-    );
+    const cleanedFirstPass = cleanPlateText(firstPass);
+    if (!cleanedFirstPass) return null;
 
-    const json = JSON.parse(response.getContentText());
-    if (json.error) {
-      console.error('Gemini API Error: ' + JSON.stringify(json.error));
-      return null;
-    }
+    if (!shouldRecheckPlate(cleanedFirstPass)) return cleanedFirstPass;
 
-    const text = json.candidates &&
-                 json.candidates[0] &&
-                 json.candidates[0].content &&
-                 json.candidates[0].content.parts &&
-                 json.candidates[0].content.parts[0] &&
-                 json.candidates[0].content.parts[0].text
-                   ? json.candidates[0].content.parts[0].text.trim()
-                   : null;
-
-    if (!text || text.toLowerCase() === 'null') return null;
-
-    return cleanPlateText(text);
+    const verified = verifySuspiciousPlate(base64, mimeType, cleanedFirstPass);
+    return verified || cleanedFirstPass;
   } catch (err) {
     console.error('extractPlateFromImage Error: ' + err.message);
     return null;
   }
+}
+
+function callGeminiPlateOcr(base64, mimeType, promptText, maxOutputTokens) {
+  const response = UrlFetchApp.fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY,
+    {
+      method: 'post',
+      contentType: 'application/json',
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        contents: [{
+          parts: [
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: base64
+              }
+            },
+            {
+              text: promptText
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: maxOutputTokens || 30
+        }
+      })
+    }
+  );
+
+  const json = JSON.parse(response.getContentText());
+  if (json.error) {
+    console.error('Gemini API Error: ' + JSON.stringify(json.error));
+    return null;
+  }
+
+  const text = json.candidates &&
+               json.candidates[0] &&
+               json.candidates[0].content &&
+               json.candidates[0].content.parts &&
+               json.candidates[0].content.parts[0] &&
+               json.candidates[0].content.parts[0].text
+                 ? json.candidates[0].content.parts[0].text.trim()
+                 : null;
+
+  if (!text || text.toLowerCase() === 'null') return null;
+  return text;
+}
+
+function buildPrimaryOcrPrompt() {
+  return 'ดูภาพนี้แล้วอ่านเฉพาะเลขทะเบียนรถที่เห็นในภาพ\n' +
+    'ตอบเฉพาะตัวอักษรและตัวเลขของทะเบียนเท่านั้น โดยไม่ต้องใส่ช่องว่าง\n' +
+    'ทะเบียนอาจเป็นรูปแบบเช่น "กข1234", "งล441", "3ขฮ8777", "1กข2345", หรือ "80-1234"\n' +
+    'ระวังตัวที่หน้าคล้ายกัน เช่น "อ/ฮ/ฬ", "ข/ช", "8/B", และ "0/O"\n' +
+    'ถ้าแยกไม่ออกหรือไม่มั่นใจในตัวใดตัวหนึ่ง ให้ตอบ "null" ทันที\n' +
+    'ให้ตอบตามภาพจริงเท่านั้น ห้ามเดาจากทะเบียนที่คิดว่าน่าจะมีในระบบ\n' +
+    'ถ้ามีหลายป้าย ให้ตอบเฉพาะป้ายที่เห็นชัดที่สุดเพียงป้ายเดียว\n' +
+    'ถ้าอ่านไม่ชัดหรือไม่มั่นใจ ให้ตอบ "null"\n' +
+    'ห้ามเดา ห้ามอธิบาย ห้ามใส่ข้อความอื่นใด';
+}
+
+function shouldRecheckPlate(plateText) {
+  if (!plateText) return false;
+  return /[อฮฬขชBbOoQqDd]/.test(plateText);
+}
+
+function verifySuspiciousPlate(base64, mimeType, firstPassPlate) {
+  const secondPass = callGeminiPlateOcr(
+    base64,
+    mimeType,
+    'ตรวจย้ำเลขทะเบียนในภาพอีกครั้งอย่างระมัดระวัง\n' +
+      'คำตอบก่อนหน้าที่ระบบอ่านได้คือ "' + firstPassPlate + '"\n' +
+      'ให้ดูจากภาพจริงเท่านั้น ห้ามยึดคำตอบก่อนหน้า ถ้าไม่แน่ใจให้ตอบ "null"\n' +
+      'ให้ระวังตัวคล้ายกัน เช่น "อ/ฮ/ฬ", "ข/ช", "8/B", และ "0/O"\n' +
+      'ตอบเฉพาะเลขทะเบียนหนึ่งค่า โดยไม่ต้องใส่ช่องว่าง และห้ามอธิบาย',
+    20
+  );
+
+  const cleanedSecondPass = cleanPlateText(secondPass);
+  if (!cleanedSecondPass) return null;
+  return cleanedSecondPass === firstPassPlate ? cleanedSecondPass : null;
 }
 
 function cleanPlateText(rawText) {
