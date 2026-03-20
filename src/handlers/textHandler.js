@@ -42,7 +42,8 @@ function handleTextMessage(context) {
              '/whois\n' +
              '/visitors\n' +
              '/log <จำนวน>\n' +
-             '/clearcache';
+             '/clearcache\n' +
+             '/version';
     }
     replyToLine(replyToken, msg);
     return;

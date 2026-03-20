@@ -22,6 +22,8 @@ function handleAdminCommand(query, adminId, event) {
       return runLogCommand(context);
     case '/clearcache':
       return runClearCacheCommand(context);
+    case '/version':
+      return runVersionCommand();
     default:
       return '❌ ไม่รู้จักคำสั่งนี้\nพิมพ์ /help เพื่อดูคำสั่งทั้งหมด';
   }
