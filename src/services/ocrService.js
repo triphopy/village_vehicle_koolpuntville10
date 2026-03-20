@@ -23,16 +23,8 @@ function extractPlateFromImage(imageId) {
       return null;
     }
 
-    if (!shouldRecheckPlate(cleanedFirstPass)) {
-      LAST_OCR_STATUS = 'success';
-      return cleanedFirstPass;
-    }
-
-    const secondPass = requestPlateOcr(imageBlob, buildRecheckOcrPrompt(cleanedFirstPass), 20);
-    const cleanedSecondPass = cleanPlateText(secondPass);
-
     LAST_OCR_STATUS = 'success';
-    return cleanedSecondPass || cleanedFirstPass;
+    return cleanedFirstPass;
   } catch (err) {
     LAST_OCR_STATUS = 'exception';
     console.error('extractPlateFromImage Error: ' + err.message);
@@ -118,14 +110,6 @@ function buildOcrPrompt() {
     'ถ้าไม่มีป้ายหรือมองไม่ออกจริงๆ ให้ตอบ null';
 }
 
-function buildRecheckOcrPrompt(firstPassPlate) {
-  return 'ตรวจเลขทะเบียนในภาพอีกครั้ง\n' +
-    'คำตอบรอบแรกคือ "' + firstPassPlate + '"\n' +
-    'ถ้าเห็นชัดว่าตรงกัน ให้ตอบค่านั้น\n' +
-    'ถ้าเห็นเป็นค่าอื่น ให้ตอบค่าที่เห็นจริง โดยไม่ต้องใส่ช่องว่าง\n' +
-    'ถ้าไม่แน่ใจจริงๆ ค่อยตอบ null';
-}
-
 function classifyGeminiError(error) {
   const code = error && error.code;
   const status = error && error.status;
@@ -186,11 +170,6 @@ function cleanPlateText(rawText) {
 
 function compactPlateText(text) {
   return (text || '').toString().replace(/\s/g, '');
-}
-
-function shouldRecheckPlate(plateText) {
-  if (!plateText) return false;
-  return /[อฮฬขช0OQDB8]/.test(plateText);
 }
 
 function normalizePlateForComparison(text) {
