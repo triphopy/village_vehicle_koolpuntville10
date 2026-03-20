@@ -346,18 +346,55 @@ function fuzzySearchPlate(ocrText) {
   if (!ocrText) return null;
 
   const data   = getCachedSheetData('Vehicles');
-  const plates = data.slice(1).map(row =>
-    row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '')
-  );
+  const normalizedOcr = normalizePlateForComparison(ocrText);
+  const plates = data.slice(1).map(row => {
+    const plate = row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '');
+    return {
+      plate,
+      normalized: normalizePlateForComparison(plate)
+    };
+  });
 
   const THRESHOLD = 0.75; // ความคล้ายขั้นต่ำ 75%
 
   const best = plates
-    .map(plate => ({ plate, score: stringSimilarity(ocrText, plate) }))
+    .map(item => ({
+      plate: item.plate,
+      score: stringSimilarity(normalizedOcr, item.normalized)
+    }))
     .filter(r => r.score >= THRESHOLD)
     .sort((a, b) => b.score - a.score)[0];
 
   return best ? best.plate : null;
+}
+
+function normalizePlateForComparison(text) {
+  if (!text) return '';
+
+  const compact = text.replace(/[\s\-]/g, '');
+  const confusionGroups = [
+    ['ฮ', 'อ', 'ฬ'],
+    ['ข', 'ช'],
+    ['บ', '6'],
+    ['0', 'O', 'D', 'Q'],
+    ['1', 'I', 'l'],
+    ['2', 'Z'],
+    ['5', 'S'],
+    ['8', 'B']
+  ];
+
+  const map = {};
+  confusionGroups.forEach(group => {
+    const canonical = group[0];
+    group.forEach(char => {
+      map[char] = canonical;
+    });
+  });
+
+  return compact
+    .split('')
+    .map(char => map[char] || char)
+    .join('');
 }
 
 /**
