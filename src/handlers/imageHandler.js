@@ -36,6 +36,12 @@ function handleImageMessage(context) {
 
   const correctedPlate = resolvePlateFromOcr(plateText);
   const result = searchByPlate(correctedPlate || plateText);
+  const logQuery = correctedPlate && correctedPlate !== plateText
+    ? '[OCR] ' + plateText + ' -> ' + correctedPlate
+    : '[OCR] ' + plateText;
+  const logResult = correctedPlate && correctedPlate !== plateText
+    ? (result.found ? 'พบข้อมูล (แก้ OCR)' : 'ไม่พบข้อมูล (แก้ OCR)')
+    : (result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
 
   const ocrNote = correctedPlate && correctedPlate !== plateText
     ? '🔍 อ่านจากรูปได้: ' + plateText + '\n📝 ตรวจในระบบแล้ว: ' + correctedPlate + '\n⚠️ กรุณาตรวจป้ายอีกครั้งก่อนอนุญาต\n\n'
@@ -45,8 +51,8 @@ function handleImageMessage(context) {
     userId,
     staff.name,
     lineName,
-    '[OCR] ' + (correctedPlate || plateText),
-    result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล'
+    logQuery,
+    logResult
   );
   replyToLine(replyToken, ocrNote + result.message);
 }
