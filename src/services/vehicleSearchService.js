@@ -73,9 +73,14 @@ function getSuggestedPlateMatches(query) {
   const target = (query || '').replace(/[\s\-]/g, '');
   if (!target) return [];
 
+  const candidateMap = buildPlateCandidateMap();
+  const generatedCandidates = generatePlateCandidates(target, 2)
+    .filter(function (candidate) { return candidateMap[candidate]; })
+    .filter(function (candidate) { return candidate !== target; });
+
   const data = getCachedSheetData('Vehicles');
   const normalizedTarget = normalizePlateForComparison(target);
-  const suggestions = data.slice(1)
+  const fuzzySuggestions = data.slice(1)
     .map(row => {
       const plate = row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '');
       return {
@@ -91,7 +96,12 @@ function getSuggestedPlateMatches(query) {
     .slice(0, 3)
     .map(item => item.plate);
 
-  return suggestions;
+  return generatedCandidates
+    .concat(fuzzySuggestions)
+    .filter(function (plate, index, arr) {
+      return arr.indexOf(plate) === index;
+    })
+    .slice(0, 3);
 }
 
 function getStatusLabel(status) {
