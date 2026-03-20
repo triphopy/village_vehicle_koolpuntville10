@@ -58,8 +58,7 @@ function searchByHouse(query) {
   const msg = matches.map(row =>
     '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
     '    ' + row[COL_VEHICLE.BRAND] + ' ' + row[COL_VEHICLE.MODEL] + ' | สี' + row[COL_VEHICLE.COLOR] + '\n' +
-    getStatusLabel(row[COL_VEHICLE.STATUS]) + '\n' +
-    getDecisionLabel(row[COL_VEHICLE.STATUS])
+    getStatusLabel(row[COL_VEHICLE.STATUS])
   ).join('\n\n');
 
   return { found: true, message: '🏠 บ้านเลขที่ ' + q + ' พบรถ ' + matches.length + ' คัน\n\n' + msg };
