@@ -212,10 +212,24 @@ function normalizePlateSearchText(text) {
 function isValidPlateSearchQuery(query) {
   const normalized = normalizePlateSearchText(query).toUpperCase();
   if (!normalized) return false;
+  if (!looksLikePlateQuery(normalized)) return false;
   if (/^\d{4}$/.test(normalized)) return true;
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
   if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
   if (normalized.length >= 5) return true;
+  return false;
+}
+
+function looksLikePlateQuery(normalized) {
+  if (!normalized) return false;
+
+  const hasThaiPlateChar = /[ก-ฮ]/.test(normalized);
+  const hasDigit = /\d/.test(normalized);
+  const isFourDigits = /^\d{4}$/.test(normalized);
+
+  if (isFourDigits) return true;
+  if (hasThaiPlateChar && hasDigit) return true;
+
   return false;
 }
 
