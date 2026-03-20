@@ -46,8 +46,8 @@ function handleImageMessage(context) {
     forcedSuggestions: forcedSuggestions
   });
   const hasHint = forcedSuggestions.length > 0 && !result.found;
-  const hasRiskyChars = shouldRecheckPlate(plateText);
-  const warningNote = (hasHint || hasRiskyChars)
+  const hasHighRiskChars = /[อฮฬ]/.test(plateText);
+  const warningNote = (hasHint || hasHighRiskChars)
     ? '⚠️ กรุณาตรวจตัวอักษรบนป้ายอีกครั้งก่อนอนุญาต\n\n'
     : '';
   const ocrNote = '🔍 อ่านจากรูปได้: ' + plateText + '\n\n';
