@@ -9,7 +9,7 @@ function searchByPlate(query) {
   if (matches.length === 0) {
     return {
       found: false,
-      message: '❌ ไม่พบข้อมูลรถในระบบ\nกรุณาแลกบัตรตามขั้นตอนปกติ\n\nผลตรวจ: ไม่พบข้อมูล ให้แลกบัตร'
+      message: '❌ ไม่พบข้อมูลรถในระบบ\nผลตรวจ: ให้แลกบัตร'
     };
   }
 
@@ -51,7 +51,7 @@ function searchByHouse(query) {
   if (matches.length === 0) {
     return {
       found: false,
-      message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ\n\nผลตรวจ: ไม่พบข้อมูล'
+      message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ\nผลตรวจ: ไม่พบข้อมูล'
     };
   }
 
