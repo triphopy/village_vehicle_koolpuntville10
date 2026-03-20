@@ -34,44 +34,19 @@ function handleImageMessage(context) {
     return;
   }
 
-  const exactPlate = findExactPlateMatch(plateText);
-  const warningNote = shouldWarnForAmbiguousPlate(plateText)
-    ? '⚠️ กรุณาตรวจตัวอักษรบนป้ายอีกครั้งก่อนอนุญาต\n\n'
-    : '';
-  const ocrNote = '🔍 อ่านจากรูปได้: ' + plateText + '\n\n';
+  const correctedPlate = resolvePlateFromOcr(plateText);
+  const result = searchByPlate(correctedPlate || plateText);
 
-  if (!exactPlate) {
-    const suggestions = getSuggestedPlateMatches(plateText);
-    const suggestionMessage = suggestions.length > 0
-      ? '❌ ไม่พบข้อมูลตรงตัวในระบบ\n\nใกล้เคียงที่อาจเป็น:\n• ' + suggestions.join('\n• ') + '\nผลตรวจ: กรุณาตรวจป้ายอีกครั้ง'
-      : '❌ ไม่พบข้อมูลตรงตัวในระบบ\nผลตรวจ: ให้แลกบัตร';
-    const logResult = suggestions.length > 0
-      ? 'ไม่พบตรงตัว (มีเลขใกล้เคียง)'
-      : 'ไม่พบตรงตัว';
-
-    writeLog(
-      userId,
-      staff.name,
-      lineName,
-      '[OCR] ' + plateText,
-      logResult
-    );
-    replyToLine(replyToken, ocrNote + warningNote + suggestionMessage);
-    return;
-  }
-
-  const result = searchByPlate(exactPlate);
+  const ocrNote = correctedPlate && correctedPlate !== plateText
+    ? '🔍 อ่านจากรูปได้: ' + plateText + '\n📝 ตรวจในระบบแล้ว: ' + correctedPlate + '\n\n'
+    : '🔍 อ่านจากรูปได้: ' + plateText + '\n\n';
 
   writeLog(
     userId,
     staff.name,
     lineName,
-    '[OCR] ' + plateText,
-    result.found ? 'พบข้อมูลตรงตัว' : 'ไม่พบข้อมูล'
+    '[OCR] ' + (correctedPlate || plateText),
+    result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล'
   );
-  replyToLine(replyToken, ocrNote + warningNote + result.message);
-}
-
-function shouldWarnForAmbiguousPlate(plateText) {
-  return /[อฮฬขช0OQDB8]/.test(plateText || '');
+  replyToLine(replyToken, ocrNote + result.message);
 }
