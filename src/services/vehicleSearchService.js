@@ -7,6 +7,14 @@ function searchByPlate(query) {
 }
 
 function searchByPlateDetailed(query) {
+  if (!isSufficientPlateQuery(query)) {
+    return {
+      found: false,
+      message: '⚠️ ข้อมูลยังไม่พอสำหรับค้นหา\nผลตรวจ: กรุณาพิมพ์เลขทะเบียนให้มากขึ้น หรือส่งรูปป้าย',
+      logResult: 'ค้นหาไม่สำเร็จ (ข้อมูลไม่พอ)'
+    };
+  }
+
   const data = getCachedSheetData('Vehicles');
   const q = compactPlateText(query).toLowerCase();
 
@@ -115,6 +123,14 @@ function buildPlateLogResult(statuses, count) {
   if (uniqueStatuses[0] === 'inactive') return 'พบข้อมูล: inactive';
   if (uniqueStatuses[0] === 'blacklist') return 'พบข้อมูล: blacklist';
   return 'พบข้อมูล';
+}
+
+function isSufficientPlateQuery(query) {
+  const compact = compactPlateText(query);
+  if (!compact) return false;
+  if (/^\d{4}$/.test(compact)) return true;
+  if (compact.length >= 5) return true;
+  return false;
 }
 
 function getSuggestedPlateMatches(query) {
