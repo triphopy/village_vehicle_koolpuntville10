@@ -1,13 +1,3 @@
-/**
- * /version — แสดงข้อมูล version ที่ deploy อยู่ปัจจุบัน
- * และเทียบกับ latest commit SHA บน main branch ของ GitHub
- *
- * Script Properties ที่ต้องตั้ง:
- *   APP_VERSION  — inject โดย GitHub Actions (เช่น main-a1b2c3d)
- *   DEPLOY_ENV   — inject โดย GitHub Actions (เช่น 🔵 BLUE (Production))
- *   DEPLOY_TIME  — inject โดย GitHub Actions (เช่น 2026-03-20 12:00:00)
- *   GITHUB_REPO  — ตั้งเองครั้งเดียว (เช่น triphopy/village_vehicle_koolpuntville10)
- */
 function runVersionCommand() {
   const version    = VERSION_INFO.version    || 'N/A';
   const env        = VERSION_INFO.env        || 'N/A';
@@ -15,7 +5,12 @@ function runVersionCommand() {
   const repo       = PropertiesService.getScriptProperties()
                        .getProperty('GITHUB_REPO') || '';
 
-  const currentSha = version.includes('-') ? version.split('-').pop() : '';
+  // แยก branch และ SHA จาก version string
+  // เช่น "feature/debugToLine-a1b2c3d" → branch="feature/debugToLine", sha="a1b2c3d"
+  //      "main-a1b2c3d"                → branch="main",                  sha="a1b2c3d"
+  const lastDash   = version.lastIndexOf('-');
+  const branch     = lastDash !== -1 ? version.substring(0, lastDash) : '';
+  const currentSha = lastDash !== -1 ? version.substring(lastDash + 1) : '';
 
   const lines = [
     '📦 Version Info',
@@ -25,14 +20,14 @@ function runVersionCommand() {
     '🕐 Deployed   : ' + deployTime,
   ];
 
-  if (repo && currentSha) {
-    const latestSha = getLatestMainSha(repo);
+  if (repo && branch && currentSha) {
+    const latestSha = getLatestSha(repo, branch);
     if (!latestSha) {
       lines.push('', '⚠️ ไม่สามารถตรวจสอบ version ล่าสุดได้');
     } else if (latestSha.startsWith(currentSha)) {
       lines.push('', '✅ เป็น version ล่าสุดแล้ว');
     } else {
-      lines.push('', '⚠️ outdated — มี version ใหม่กว่าบน main');
+      lines.push('', '⚠️ outdated — มี commit ใหม่กว่าบน ' + branch);
       lines.push('🆕 Latest SHA : ' + latestSha.substring(0, 7));
     }
   } else if (!repo) {
@@ -42,9 +37,9 @@ function runVersionCommand() {
   return lines.join('\n');
 }
 
-function getLatestMainSha(repo) {
+function getLatestSha(repo, branch) {
   try {
-    const url = 'https://api.github.com/repos/' + repo + '/commits/main';
+    const url = 'https://api.github.com/repos/' + repo + '/commits/' + encodeURIComponent(branch);
     const res = UrlFetchApp.fetch(url, {
       headers: { 'User-Agent': 'GAS-VersionChecker' },
       muteHttpExceptions: true
@@ -52,7 +47,7 @@ function getLatestMainSha(repo) {
     if (res.getResponseCode() !== 200) return null;
     return JSON.parse(res.getContentText()).sha || null;
   } catch (e) {
-    console.error('getLatestMainSha error: ' + e);
+    console.error('getLatestSha error: ' + e);
     return null;
   }
 }
