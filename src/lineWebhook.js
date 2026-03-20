@@ -36,7 +36,7 @@ function doPost(e) {
 
 
     const data = JSON.parse(e.postData.contents);
-    if (!data.events) return;
+    if (!data.events) return ContentService.createTextOutput('OK');
 
     data.events.forEach(event => {
       const userId     = event.source.userId;
@@ -137,6 +137,8 @@ function doPost(e) {
   } catch(err) {
     console.error('doPost Error: ' + err.stack);
   }
+
+  return ContentService.createTextOutput('OK');
 }
 
 // ============================
