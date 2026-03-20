@@ -17,6 +17,7 @@ function searchByPlateDetailed(query) {
 
   const data = getCachedSheetData('Vehicles');
   const q = compactPlateText(query).toLowerCase();
+  const isLastFourDigitsQuery = /^\d{4}$/.test(q);
 
   const matches = data.slice(1).filter(row =>
     compactPlateText(row[COL_VEHICLE.PLATE]).toLowerCase().includes(q)
@@ -47,13 +48,16 @@ function searchByPlateDetailed(query) {
   const header = matches.length > 1
     ? '✅ พบข้อมูล ' + matches.length + ' รายการ\n\n'
     : '✅ พบข้อมูลในระบบ\n\n';
+  const queryHeader = isLastFourDigitsQuery
+    ? '🔎 ค้นหาจากเลขท้ายทะเบียน: ' + q + '\n\n'
+    : '';
   const statuses = matches.map(function (row) {
     return (row[COL_VEHICLE.STATUS] || '').toString().toLowerCase() || 'unknown';
   });
 
   return {
     found: true,
-    message: header + msg,
+    message: queryHeader + header + msg,
     logResult: buildPlateLogResult(statuses, matches.length),
     statuses: statuses,
     count: matches.length
