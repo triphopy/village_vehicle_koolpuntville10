@@ -38,7 +38,7 @@ function handleImageMessage(context) {
   const result = searchByPlate(correctedPlate || plateText);
 
   const ocrNote = correctedPlate && correctedPlate !== plateText
-    ? '🔍 อ่านจากรูปได้: ' + plateText + '\n📝 ตรวจในระบบแล้ว: ' + correctedPlate + '\n\n'
+    ? '🔍 อ่านจากรูปได้: ' + plateText + '\n📝 ตรวจในระบบแล้ว: ' + correctedPlate + '\n⚠️ กรุณาตรวจป้ายอีกครั้งก่อนอนุญาต\n\n'
     : '🔍 อ่านจากรูปได้: ' + plateText + '\n\n';
 
   writeLog(
