@@ -18,6 +18,14 @@ function searchByPlateDetailed(query, options) {
     };
   }
 
+  if (source === 'text' && !isValidPlateSearchQuery(query)) {
+    return {
+      found: false,
+      message: '⚠️ ข้อมูลยังไม่พอสำหรับค้นหา\nผลตรวจ: กรุณาพิมพ์เลขทะเบียนให้มากขึ้น หรือส่งรูปป้าย',
+      logResult: 'ข้อมูลไม่พอสำหรับค้นหา'
+    };
+  }
+
   const data = getCachedSheetData('Vehicles');
   const matches = data.slice(1).filter(function (row) {
     return normalizePlateSearchText(row[COL_VEHICLE.PLATE]).includes(normalizedQuery);
@@ -199,6 +207,16 @@ function normalizePlateSearchText(text) {
   return ((text || '') + '')
     .replace(/[\s\-]/g, '')
     .toLowerCase();
+}
+
+function isValidPlateSearchQuery(query) {
+  const normalized = normalizePlateSearchText(query).toUpperCase();
+  if (!normalized) return false;
+  if (/^\d{4}$/.test(normalized)) return true;
+  if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
+  if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
+  if (normalized.length >= 5) return true;
+  return false;
 }
 
 function getStatusLabel(status) {
