@@ -1,5 +1,5 @@
 /**
- * รับ imageId จาก LINE → ดึงรูป → ส่ง Gemini 2.5 Flash-Lite → คืนค่าทะเบียน
+ * รับ imageId จาก LINE -> ดึงรูป -> ส่ง Gemini 2.5 Flash-Lite -> คืนค่าทะเบียน
  * @param {string} imageId
  * @returns {string|null}
  */
@@ -10,7 +10,7 @@ function extractPlateFromImage(imageId) {
     const imageResponse = UrlFetchApp.fetch(
       'https://api-data.line.me/v2/bot/message/' + imageId + '/content',
       {
-        headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN },
+        headers: { Authorization: 'Bearer ' + LINE_ACCESS_TOKEN },
         muteHttpExceptions: true
       }
     );
@@ -39,11 +39,12 @@ function extractPlateFromImage(imageId) {
                 }
               },
               {
-                text: 'ดูรูปนี้แล้วหาป้ายทะเบียนรถ\n' +
-                      'ตอบแค่ตัวอักษรและตัวเลขบนป้ายทะเบียนเท่านั้น ไม่ต้องมีช่องว่าง เช่น "กข1234" หรือ "1กข2345"\n' +
-                      'ถ้ามีหลายป้าย ให้ตอบป้ายที่เห็นชัดที่สุดเพียงป้ายเดียว\n' +
-                      'ถ้าไม่มีป้ายทะเบียนหรืออ่านไม่ได้เลย ตอบว่า "null"\n' +
-                      'ห้ามอธิบาย ห้ามใส่ข้อความอื่นใด'
+                text: 'ดูภาพนี้แล้วอ่านเฉพาะเลขทะเบียนรถที่เห็นในภาพ\n' +
+                      'ตอบเฉพาะตัวอักษรและตัวเลขของทะเบียนเท่านั้น โดยไม่ต้องใส่ช่องว่าง\n' +
+                      'ทะเบียนอาจเป็นรูปแบบเช่น "กข1234", "งล441", "3ขฮ8777", "1กข2345", หรือ "80-1234"\n' +
+                      'ถ้ามีหลายป้าย ให้ตอบเฉพาะป้ายที่เห็นชัดที่สุดเพียงป้ายเดียว\n' +
+                      'ถ้าอ่านไม่ชัดหรือไม่มั่นใจ ให้ตอบ "null"\n' +
+                      'ห้ามเดา ห้ามอธิบาย ห้ามใส่ข้อความอื่นใด'
               }
             ]
           }],
@@ -92,7 +93,7 @@ function cleanPlateText(rawText) {
   ];
 
   if (/^\d{1,2}-\d{4}$/.test(original)) return original;
-  if (patterns.some(p => p.test(cleaned))) return cleaned;
+  if (patterns.some(function (pattern) { return pattern.test(cleaned); })) return cleaned;
 
   const extracted = cleaned.match(/[ก-ฮ]{1,3}\d{1,4}|\d{1,2}[ก-ฮ]{1,2}\d{4}|\d{1,2}\d{4}/);
   return extracted ? extracted[0] : null;
@@ -102,13 +103,23 @@ function compactPlateText(text) {
   return (text || '').toString().replace(/[\s\-]/g, '');
 }
 
+function normalizePlateForLookup(text) {
+  const compact = compactPlateText(text);
+  const thaiPlateMatch = compact.match(/^([ก-ฮ]{1,3})(\d{1,4})$/);
+  if (!thaiPlateMatch) return compact;
+
+  const prefix = thaiPlateMatch[1];
+  const digits = thaiPlateMatch[2].replace(/^0+/, '');
+  return prefix + (digits || '0');
+}
+
 function fuzzySearchPlate(ocrText) {
   if (!ocrText) return null;
 
   const data = getCachedSheetData('Vehicles');
   const normalizedOcr = normalizePlateForComparison(ocrText);
-  const plates = data.slice(1).map(row => {
-    const plate = row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '');
+  const plates = data.slice(1).map(function (row) {
+    const plate = compactPlateText(row[COL_VEHICLE.PLATE]);
     return {
       plate: plate,
       normalized: normalizePlateForComparison(plate)
@@ -116,12 +127,14 @@ function fuzzySearchPlate(ocrText) {
   });
 
   const best = plates
-    .map(item => ({
-      plate: item.plate,
-      score: stringSimilarity(normalizedOcr, item.normalized)
-    }))
-    .filter(r => r.score >= 0.75)
-    .sort((a, b) => b.score - a.score)[0];
+    .map(function (item) {
+      return {
+        plate: item.plate,
+        score: stringSimilarity(normalizedOcr, item.normalized)
+      };
+    })
+    .filter(function (item) { return item.score >= 0.75; })
+    .sort(function (a, b) { return b.score - a.score; })[0];
 
   return best ? best.plate : null;
 }
@@ -140,12 +153,14 @@ function resolvePlateFromOcr(ocrText) {
 
 function findExactPlateMatch(text) {
   const target = compactPlateText(text);
+  const normalizedTarget = normalizePlateForLookup(text);
   if (!target) return null;
 
   const data = getCachedSheetData('Vehicles');
-  const match = data.slice(1).find(row =>
-    compactPlateText(row[COL_VEHICLE.PLATE]) === target
-  );
+  const match = data.slice(1).find(function (row) {
+    return compactPlateText(row[COL_VEHICLE.PLATE]) === target ||
+      normalizePlateForLookup(row[COL_VEHICLE.PLATE]) === normalizedTarget;
+  });
 
   return match ? compactPlateText(match[COL_VEHICLE.PLATE]) : null;
 }
@@ -168,7 +183,7 @@ function buildPlateCandidateMap() {
   const data = getCachedSheetData('Vehicles');
   const map = {};
 
-  data.slice(1).forEach(row => {
+  data.slice(1).forEach(function (row) {
     const plate = compactPlateText(row[COL_VEHICLE.PLATE]);
     if (plate) map[plate] = plate;
   });
@@ -249,16 +264,16 @@ function normalizePlateForComparison(text) {
   ];
 
   const map = {};
-  confusionGroups.forEach(group => {
+  confusionGroups.forEach(function (group) {
     const canonical = group[0];
-    group.forEach(char => {
+    group.forEach(function (char) {
       map[char] = canonical;
     });
   });
 
   return compact
     .split('')
-    .map(char => map[char] || char)
+    .map(function (char) { return map[char] || char; })
     .join('');
 }
 
