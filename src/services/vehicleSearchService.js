@@ -8,6 +8,7 @@ function searchByPlateDetailed(query, options) {
   const forcedSuggestions = opts.forcedSuggestions || [];
   const normalizedQuery = normalizePlateSearchText(query);
   const isPartialQuery = source === 'text' && isPartialPlateQuery(query);
+  const isTail4Query = source === 'text' && isTailFourSearchQuery(query);
 
   if (!normalizedQuery) {
     return {
@@ -66,6 +67,14 @@ function searchByPlateDetailed(query, options) {
         ? '❌ ไม่พบข้อมูลตรงตัวในระบบ\nผลตรวจ: ให้แลกบัตร'
         : '❌ ไม่พบข้อมูลรถในระบบ\nผลตรวจ: ให้แลกบัตร',
       logResult: 'ไม่พบข้อมูล'
+    };
+  }
+
+  if (isTail4Query) {
+    return {
+      found: false,
+      message: buildTailFourMessage(query, matches),
+      logResult: 'ค้นหาจากเลขท้ายทะเบียน: พบ ' + matches.length + ' รายการ'
     };
   }
 
@@ -166,6 +175,22 @@ function buildPartialPlateMessage(query, matches) {
     '\n\nผลตรวจ: กรุณาตรวจทะเบียนให้ครบอีกครั้ง';
 }
 
+function buildTailFourMessage(query, matches) {
+  const compactQuery = compactPlateText(query);
+  const list = matches.slice(0, 5).map(function (row) {
+    return '• ' + row[COL_VEHICLE.PLATE];
+  }).join('\n');
+  const extraCount = matches.length - Math.min(matches.length, 5);
+  const extraLine = extraCount > 0 ? '\n• และอีก ' + extraCount + ' รายการ' : '';
+
+  return '🔎 ค้นหาจากเลขท้ายทะเบียน: ' + compactQuery + '\n\n' +
+    '⚠️ กรุณาตรวจทะเบียนให้ตรงอีกครั้ง\n' +
+    'พบข้อมูลที่ใกล้เคียง:\n' +
+    list +
+    extraLine +
+    '\n\nผลตรวจ: กรุณาตรวจทะเบียนให้ตรงอีกครั้ง';
+}
+
 function formatVehicleLine(row) {
   const brand = ((row[COL_VEHICLE.BRAND] || '') + '').trim();
   const model = ((row[COL_VEHICLE.MODEL] || '') + '').trim();
@@ -263,6 +288,11 @@ function isPartialPlateQuery(query) {
   const thaiMatches = normalized.match(/[ก-ฮ]/g) || [];
   const digitMatches = normalized.match(/\d/g) || [];
   return thaiMatches.length >= 2 && digitMatches.length >= 2;
+}
+
+function isTailFourSearchQuery(query) {
+  const normalized = normalizePlateSearchText(query).toUpperCase();
+  return /^\d{4}$/.test(normalized);
 }
 
 function looksLikePlateQuery(normalized) {
