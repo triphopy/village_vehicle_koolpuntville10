@@ -22,7 +22,7 @@ function getLineDisplayName(userId) {
 }
 
 function replyToLine(token, msg) {
-  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
+  const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
@@ -34,10 +34,14 @@ function replyToLine(token, msg) {
     }),
     muteHttpExceptions: true
   });
+
+  if (response.getResponseCode() >= 300) {
+    console.error('replyToLine failed: ' + response.getResponseCode() + ' ' + response.getContentText());
+  }
 }
 
 function pushToLine(userId, message) {
-  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+  const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
@@ -49,4 +53,8 @@ function pushToLine(userId, message) {
     }),
     muteHttpExceptions: true
   });
+
+  if (response.getResponseCode() >= 300) {
+    console.error('pushToLine failed for ' + userId + ': ' + response.getResponseCode() + ' ' + response.getContentText());
+  }
 }

@@ -9,16 +9,25 @@ function runLogCommand(context) {
 
   const lastRows = dataRows.slice(-limit).reverse();
   const lines = ['📋 Log ' + limit + ' รายการล่าสุด\n'];
-  lastRows.forEach(row => {
+
+  lastRows.forEach(function (row) {
     const time = row[COL_LOG.TIMESTAMP]
       ? Utilities.formatDate(new Date(row[COL_LOG.TIMESTAMP]), 'Asia/Bangkok', 'dd/MM HH:mm')
       : '-';
     const name = row[COL_LOG.STAFF_NAME] || row[COL_LOG.UID] || '-';
     const q = row[COL_LOG.QUERY] || '-';
     const res = row[COL_LOG.RESULT] || '-';
-    const icon = res === 'พบข้อมูล' ? '✅' : '❌';
-    lines.push(icon + ' ' + time + ' | ' + name + '\n    🔍 ' + q);
+    const icon = getLogResultIcon(res);
+
+    lines.push(icon + ' ' + time + ' | ' + name + '\n    🔍 ' + q + '\n    ' + res);
   });
 
   return lines.join('\n');
+}
+
+function getLogResultIcon(result) {
+  const normalized = (result || '').toString().toLowerCase();
+  if (normalized.indexOf('ไม่พบ') !== -1) return '❌';
+  if (normalized.indexOf('พบ') !== -1) return '✅';
+  return 'ℹ️';
 }

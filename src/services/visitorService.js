@@ -1,6 +1,9 @@
 function trackUser(userId, displayName) {
   const cache = CacheService.getScriptCache();
   const cacheKey = 'tracked_' + userId;
+  const cached = cache.get(cacheKey);
+  if (cached === '1') return;
+
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Visitors');
   if (!sheet) return;
 

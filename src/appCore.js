@@ -108,6 +108,11 @@ function debugToLine(msg) {
     .map(function (id) { return id.trim(); })
     .filter(function (id) { return id; });
 
+  if (adminUids.length === 0) {
+    console.warn('debugToLine skipped: ADMIN_UID is empty');
+    return;
+  }
+
   adminUids.forEach(function (adminUid) {
     const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
       method: 'post',

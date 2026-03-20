@@ -28,7 +28,10 @@ function searchByPlateDetailed(query, options) {
 
   const data = getCachedSheetData('Vehicles');
   const matches = data.slice(1).filter(function (row) {
-    return normalizePlateSearchText(row[COL_VEHICLE.PLATE]).includes(normalizedQuery);
+    const normalizedPlate = normalizePlateSearchText(row[COL_VEHICLE.PLATE]);
+    return source === 'ocr'
+      ? normalizedPlate === normalizedQuery
+      : normalizedPlate.includes(normalizedQuery);
   });
 
   if (matches.length === 0) {
@@ -161,15 +164,6 @@ function findSuggestedPlates(query, forcedSuggestions, limit) {
 
   forcedSuggestions.forEach(pushSuggestion);
 
-  data.slice(1).forEach(function (row) {
-    const plate = compactPlateText(row[COL_VEHICLE.PLATE]).toUpperCase();
-    if (!plate) return;
-    if (plate === queryCompact) return;
-    if (queryCompact && plate.indexOf(queryCompact) !== -1) {
-      pushSuggestion(plate);
-    }
-  });
-
   const scored = data.slice(1).map(function (row) {
     const plate = compactPlateText(row[COL_VEHICLE.PLATE]).toUpperCase();
     return {
@@ -216,19 +210,17 @@ function isValidPlateSearchQuery(query) {
   if (/^\d{4}$/.test(normalized)) return true;
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
   if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
-  if (normalized.length >= 5) return true;
   return false;
 }
 
 function looksLikePlateQuery(normalized) {
   if (!normalized) return false;
 
-  const hasThaiPlateChar = /[ก-ฮ]/.test(normalized);
+  const hasThai = /[ก-ฮ]/.test(normalized);
   const hasDigit = /\d/.test(normalized);
-  const isFourDigits = /^\d{4}$/.test(normalized);
 
-  if (isFourDigits) return true;
-  if (hasThaiPlateChar && hasDigit) return true;
+  if (/^\d{4}$/.test(normalized)) return true;
+  if (hasThai && hasDigit) return true;
 
   return false;
 }
