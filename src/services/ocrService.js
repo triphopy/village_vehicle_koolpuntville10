@@ -95,20 +95,47 @@ function buildPrimaryOcrPrompt() {
 function cleanPlateText(rawText) {
   if (!rawText) return null;
 
-  const original = rawText.trim();
-  const cleaned = original.replace(/[\s\-]/g, '');
+  const original = rawText.trim()
+    .replace(/["'`]/g, '')
+    .replace(/[：:]/g, ' ')
+    .replace(/\s+/g, ' ');
+  const compact = compactPlateText(original);
+  const compactUpper = compact.toUpperCase();
 
-  const patterns = [
+  const compactPatterns = [
     /^[ก-ฮ]{1,3}\d{1,4}$/,
     /^\d{1,2}[ก-ฮ]{1,2}\d{4}$/,
     /^\d{1,2}\d{4}$/
   ];
 
   if (/^\d{1,2}-\d{4}$/.test(original)) return original;
-  if (patterns.some(function (pattern) { return pattern.test(cleaned); })) return cleaned;
+  if (compactPatterns.some(function (pattern) { return pattern.test(compactUpper); })) return compactUpper;
 
-  const extracted = cleaned.match(/[ก-ฮ]{1,3}\d{1,4}|\d{1,2}[ก-ฮ]{1,2}\d{4}|\d{1,2}\d{4}/);
-  return extracted ? extracted[0] : null;
+  const extractedCompact = compactUpper.match(/[ก-ฮ]{1,3}\d{1,4}|\d{1,2}[ก-ฮ]{1,2}\d{4}|\d{1,2}\d{4}/);
+  if (extractedCompact) return extractedCompact[0];
+
+  const spacedPatterns = [
+    /([ก-ฮ]{1,3})\s*(\d{1,4})/,
+    /(\d{1,2})\s*([ก-ฮ]{1,2})\s*(\d{4})/,
+    /(\d{1,2})\s*-\s*(\d{4})/
+  ];
+
+  for (let i = 0; i < spacedPatterns.length; i++) {
+    const match = original.toUpperCase().match(spacedPatterns[i]);
+    if (match) {
+      return match.slice(1).join('').replace(/\s/g, '');
+    }
+  }
+
+  const tokens = original.toUpperCase().split(/\s+/).filter(function (token) { return token; });
+  for (let j = 0; j < tokens.length; j++) {
+    const candidate = compactPlateText(tokens[j]);
+    if (compactPatterns.some(function (pattern) { return pattern.test(candidate); })) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
 
 function compactPlateText(text) {
