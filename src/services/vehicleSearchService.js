@@ -8,7 +8,7 @@ function searchByPlateDetailed(query, options) {
   const forcedSuggestions = opts.forcedSuggestions || [];
   const normalizedQuery = normalizePlateSearchText(query);
   const isPartialQuery = source === 'text' && isPartialPlateQuery(query);
-  const isTail4Query = source === 'text' && isTailFourSearchQuery(query);
+  const isTailQuery = source === 'text' && isTailNumberSearchQuery(query);
 
   if (!normalizedQuery) {
     return {
@@ -39,20 +39,27 @@ function searchByPlateDetailed(query, options) {
   if (matches.length === 0) {
     const suggestions = findSuggestedPlates(query, forcedSuggestions, 3);
     if (suggestions.length > 0) {
-      const lines = [
-        isPartialQuery
-          ? '🔎 ค้นหาจากทะเบียนบางส่วน: ' + compactPlateText(query)
-          : null,
-        source === 'ocr' ? '❌ ไม่พบข้อมูลตรงตัวในระบบ' : '❌ ไม่พบข้อมูลรถในระบบ',
-        '',
-        'ใกล้เคียงที่อาจเป็น:',
-        suggestions.map(function (plate) { return '• ' + plate; }).join('\n'),
+      const lines = [];
+
+      if (isTailQuery) {
+        lines.push('🔎 ค้นหาจากเลขท้ายทะเบียน: ' + compactPlateText(query));
+      } else if (isPartialQuery) {
+        lines.push('🔎 ค้นหาจากทะเบียนบางส่วน: ' + compactPlateText(query));
+      }
+
+      lines.push(source === 'ocr' ? '❌ ไม่พบข้อมูลตรงตัวในระบบ' : '❌ ไม่พบข้อมูลรถในระบบ');
+      lines.push('');
+      lines.push('ใกล้เคียงที่อาจเป็น:');
+      lines.push(suggestions.map(function (plate) { return '• ' + plate; }).join('\n'));
+      lines.push(
         source === 'ocr'
           ? 'ผลตรวจ: กรุณาตรวจป้ายอีกครั้ง'
-          : isPartialQuery
-            ? 'ผลตรวจ: กรุณาตรวจทะเบียนให้ครบอีกครั้ง'
-          : 'ผลตรวจ: กรุณาตรวจทะเบียนอีกครั้ง'
-      ].filter(function (line) { return line !== null; });
+          : isTailQuery
+            ? 'ผลตรวจ: กรุณาตรวจทะเบียนให้ตรงอีกครั้ง'
+            : isPartialQuery
+              ? 'ผลตรวจ: กรุณาตรวจทะเบียนให้ครบอีกครั้ง'
+              : 'ผลตรวจ: กรุณาตรวจทะเบียนอีกครั้ง'
+      );
 
       return {
         found: false,
@@ -70,10 +77,10 @@ function searchByPlateDetailed(query, options) {
     };
   }
 
-  if (isTail4Query) {
+  if (isTailQuery) {
     return {
       found: false,
-      message: buildTailFourMessage(query, matches),
+      message: buildTailNumberMessage(query, matches),
       logResult: 'ค้นหาจากเลขท้ายทะเบียน: พบ ' + matches.length + ' รายการ'
     };
   }
@@ -82,7 +89,7 @@ function searchByPlateDetailed(query, options) {
     return {
       found: false,
       message: buildPartialPlateMessage(query, matches),
-      logResult: 'ค้นหาทะเบียนบางส่วน: พบ ' + matches.length + ' รายการ'
+      logResult: 'ค้นหาจากทะเบียนบางส่วน: พบ ' + matches.length + ' รายการ'
     };
   }
 
@@ -175,7 +182,7 @@ function buildPartialPlateMessage(query, matches) {
     '\n\nผลตรวจ: กรุณาตรวจทะเบียนให้ครบอีกครั้ง';
 }
 
-function buildTailFourMessage(query, matches) {
+function buildTailNumberMessage(query, matches) {
   const compactQuery = compactPlateText(query);
   const list = matches.slice(0, 5).map(function (row) {
     return '• ' + row[COL_VEHICLE.PLATE];
@@ -222,9 +229,7 @@ function findSuggestedPlates(query, forcedSuggestions, limit) {
     const candidateMap = buildPlateCandidateMap();
     const generatedCandidates = generatePlateCandidates(queryCompact, 2);
     generatedCandidates.forEach(function (candidate) {
-      if (candidateMap[candidate]) {
-        pushSuggestion(candidateMap[candidate]);
-      }
+      if (candidateMap[candidate]) pushSuggestion(candidateMap[candidate]);
     });
   }
 
@@ -272,7 +277,7 @@ function isValidPlateSearchQuery(query) {
   const normalized = normalizePlateSearchText(query).toUpperCase();
   if (!normalized) return false;
   if (!looksLikePlateQuery(normalized)) return false;
-  if (/^\d{4}$/.test(normalized)) return true;
+  if (/^\d{3,4}$/.test(normalized)) return true;
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
   if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
   if (isPartialPlateQuery(query)) return true;
@@ -282,7 +287,7 @@ function isValidPlateSearchQuery(query) {
 function isPartialPlateQuery(query) {
   const normalized = normalizePlateSearchText(query).toUpperCase();
   if (!normalized) return false;
-  if (/^\d{4}$/.test(normalized)) return false;
+  if (/^\d{3,4}$/.test(normalized)) return false;
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return false;
   if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return false;
   const thaiMatches = normalized.match(/[ก-ฮ]/g) || [];
@@ -290,9 +295,9 @@ function isPartialPlateQuery(query) {
   return thaiMatches.length >= 2 && digitMatches.length >= 2;
 }
 
-function isTailFourSearchQuery(query) {
+function isTailNumberSearchQuery(query) {
   const normalized = normalizePlateSearchText(query).toUpperCase();
-  return /^\d{4}$/.test(normalized);
+  return /^\d{3,4}$/.test(normalized);
 }
 
 function looksLikePlateQuery(normalized) {
@@ -301,7 +306,7 @@ function looksLikePlateQuery(normalized) {
   const hasThai = /[ก-ฮ]/.test(normalized);
   const hasDigit = /\d/.test(normalized);
 
-  if (/^\d{4}$/.test(normalized)) return true;
+  if (/^\d{3,4}$/.test(normalized)) return true;
   if (hasThai && hasDigit) return true;
 
   return false;
