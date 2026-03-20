@@ -22,120 +22,80 @@ function extractPlateFromImage(imageId) {
 
     const imageBlob = imageResponse.getBlob();
     const base64 = Utilities.base64Encode(imageBlob.getBytes());
-    const mimeType = imageBlob.getContentType() || 'image/jpeg';
-    const firstPass = callGeminiPlateOcr(base64, mimeType, buildPrimaryOcrPrompt(), 30);
-    if (!firstPass) return null;
 
-    const cleanedFirstPass = cleanPlateText(firstPass);
-    if (!cleanedFirstPass) return null;
+    const response = UrlFetchApp.fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY,
+      {
+        method: 'post',
+        contentType: 'application/json',
+        muteHttpExceptions: true,
+        payload: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                inline_data: {
+                  mime_type: imageBlob.getContentType() || 'image/jpeg',
+                  data: base64
+                }
+              },
+              {
+                text: 'ดูรูปนี้แล้วหาป้ายทะเบียนรถ\n' +
+                      'ตอบแค่ตัวอักษรและตัวเลขบนป้ายทะเบียนเท่านั้น ไม่ต้องมีช่องว่าง เช่น "กข1234" หรือ "1กข2345"\n' +
+                      'ถ้ามีหลายป้าย ให้ตอบป้ายที่เห็นชัดที่สุดเพียงป้ายเดียว\n' +
+                      'ถ้าไม่มีป้ายทะเบียนหรืออ่านไม่ได้เลย ตอบว่า "null"\n' +
+                      'ห้ามอธิบาย ห้ามใส่ข้อความอื่นใด'
+              }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 30
+          }
+        })
+      }
+    );
 
-    return cleanedFirstPass;
+    const json = JSON.parse(response.getContentText());
+    if (json.error) {
+      console.error('Gemini API Error: ' + JSON.stringify(json.error));
+      return null;
+    }
+
+    const text = json.candidates &&
+                 json.candidates[0] &&
+                 json.candidates[0].content &&
+                 json.candidates[0].content.parts &&
+                 json.candidates[0].content.parts[0] &&
+                 json.candidates[0].content.parts[0].text
+                   ? json.candidates[0].content.parts[0].text.trim()
+                   : null;
+
+    if (!text || text.toLowerCase() === 'null') return null;
+
+    return cleanPlateText(text);
   } catch (err) {
     console.error('extractPlateFromImage Error: ' + err.message);
     return null;
   }
 }
 
-function callGeminiPlateOcr(base64, mimeType, promptText, maxOutputTokens) {
-  const response = UrlFetchApp.fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY,
-    {
-      method: 'post',
-      contentType: 'application/json',
-      muteHttpExceptions: true,
-      payload: JSON.stringify({
-        contents: [{
-          parts: [
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: base64
-              }
-            },
-            {
-              text: promptText
-            }
-          ]
-        }],
-        generationConfig: {
-          temperature: 0,
-          maxOutputTokens: maxOutputTokens || 30
-        }
-      })
-    }
-  );
-
-  const json = JSON.parse(response.getContentText());
-  if (json.error) {
-    console.error('Gemini API Error: ' + JSON.stringify(json.error));
-    return null;
-  }
-
-  const text = json.candidates &&
-               json.candidates[0] &&
-               json.candidates[0].content &&
-               json.candidates[0].content.parts &&
-               json.candidates[0].content.parts[0] &&
-               json.candidates[0].content.parts[0].text
-                 ? json.candidates[0].content.parts[0].text.trim()
-                 : null;
-
-  if (!text || text.toLowerCase() === 'null') return null;
-  return text;
-}
-
-function buildPrimaryOcrPrompt() {
-  return 'อ่านเลขทะเบียนรถจากภาพนี้\n' +
-    'ตอบเฉพาะเลขทะเบียนที่เห็น โดยไม่ต้องใส่ช่องว่าง\n' +
-    'ตัวอย่างรูปแบบ: กข1234, งล441, 3ขฮ8777, 1กข2345, 80-1234\n' +
-    'ถ้ามีหลายป้าย ให้ตอบป้ายที่ชัดที่สุดเพียงป้ายเดียว\n' +
-    'ถ้าไม่มีป้ายหรือมองไม่ออกจริงๆ ให้ตอบ null';
-}
-
 function cleanPlateText(rawText) {
   if (!rawText) return null;
 
-  const original = rawText.trim()
-    .replace(/["'`]/g, '')
-    .replace(/[：:]/g, ' ')
-    .replace(/\s+/g, ' ');
-  const compact = compactPlateText(original);
-  const compactUpper = compact.toUpperCase();
+  const original = rawText.trim();
+  const cleaned = original.replace(/[\s\-]/g, '');
 
-  const compactPatterns = [
+  const patterns = [
     /^[ก-ฮ]{1,3}\d{1,4}$/,
     /^\d{1,2}[ก-ฮ]{1,2}\d{4}$/,
     /^\d{1,2}\d{4}$/
   ];
 
   if (/^\d{1,2}-\d{4}$/.test(original)) return original;
-  if (compactPatterns.some(function (pattern) { return pattern.test(compactUpper); })) return compactUpper;
+  if (patterns.some(function (pattern) { return pattern.test(cleaned); })) return cleaned;
 
-  const extractedCompact = compactUpper.match(/[ก-ฮ]{1,3}\d{1,4}|\d{1,2}[ก-ฮ]{1,2}\d{4}|\d{1,2}\d{4}/);
-  if (extractedCompact) return extractedCompact[0];
-
-  const spacedPatterns = [
-    /([ก-ฮ]{1,3})\s*(\d{1,4})/,
-    /(\d{1,2})\s*([ก-ฮ]{1,2})\s*(\d{4})/,
-    /(\d{1,2})\s*-\s*(\d{4})/
-  ];
-
-  for (let i = 0; i < spacedPatterns.length; i++) {
-    const match = original.toUpperCase().match(spacedPatterns[i]);
-    if (match) {
-      return match.slice(1).join('').replace(/\s/g, '');
-    }
-  }
-
-  const tokens = original.toUpperCase().split(/\s+/).filter(function (token) { return token; });
-  for (let j = 0; j < tokens.length; j++) {
-    const candidate = compactPlateText(tokens[j]);
-    if (compactPatterns.some(function (pattern) { return pattern.test(candidate); })) {
-      return candidate;
-    }
-  }
-
-  return null;
+  const extracted = cleaned.match(/[ก-ฮ]{1,3}\d{1,4}|\d{1,2}[ก-ฮ]{1,2}\d{4}|\d{1,2}\d{4}/);
+  return extracted ? extracted[0] : null;
 }
 
 function compactPlateText(text) {
