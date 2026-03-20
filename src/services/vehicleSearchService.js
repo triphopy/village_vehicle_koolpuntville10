@@ -1,4 +1,12 @@
 function searchByPlate(query) {
+  const result = searchByPlateDetailed(query);
+  return {
+    found: result.found,
+    message: result.message
+  };
+}
+
+function searchByPlateDetailed(query) {
   const data = getCachedSheetData('Vehicles');
   const q = compactPlateText(query).toLowerCase();
 
@@ -14,7 +22,9 @@ function searchByPlate(query) {
 
     return {
       found: false,
-      message: '❌ ไม่พบข้อมูลรถในระบบ' + suggestionText
+      message: '❌ ไม่พบข้อมูลรถในระบบ' + suggestionText,
+      logResult: suggestions.length > 0 ? 'ไม่พบข้อมูล (มีเลขใกล้เคียง)' : 'ไม่พบข้อมูล',
+      suggestions: suggestions
     };
   }
 
@@ -29,11 +39,28 @@ function searchByPlate(query) {
   const header = matches.length > 1
     ? '✅ พบข้อมูล ' + matches.length + ' รายการ\n\n'
     : '✅ พบข้อมูลในระบบ\n\n';
+  const statuses = matches.map(function (row) {
+    return (row[COL_VEHICLE.STATUS] || '').toString().toLowerCase() || 'unknown';
+  });
 
-  return { found: true, message: header + msg };
+  return {
+    found: true,
+    message: header + msg,
+    logResult: buildPlateLogResult(statuses, matches.length),
+    statuses: statuses,
+    count: matches.length
+  };
 }
 
 function searchByHouse(query) {
+  const result = searchByHouseDetailed(query);
+  return {
+    found: result.found,
+    message: result.message
+  };
+}
+
+function searchByHouseDetailed(query) {
   const data = getCachedSheetData('Vehicles');
   const q = query.trim();
 
@@ -56,7 +83,8 @@ function searchByHouse(query) {
   if (matches.length === 0) {
     return {
       found: false,
-      message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ\nผลตรวจ: ไม่พบข้อมูล'
+      message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ\nผลตรวจ: ไม่พบข้อมูล',
+      logResult: 'ค้นบ้านเลขที่: ไม่พบข้อมูล'
     };
   }
 
@@ -66,7 +94,27 @@ function searchByHouse(query) {
     getStatusLabel(row[COL_VEHICLE.STATUS])
   ).join('\n\n');
 
-  return { found: true, message: '🏠 บ้านเลขที่ ' + q + ' พบรถ ' + matches.length + ' คัน\n\n' + msg };
+  return {
+    found: true,
+    message: '🏠 บ้านเลขที่ ' + q + ' พบรถ ' + matches.length + ' คัน\n\n' + msg,
+    logResult: 'ค้นบ้านเลขที่: พบ ' + matches.length + ' คัน',
+    count: matches.length
+  };
+}
+
+function buildPlateLogResult(statuses, count) {
+  const uniqueStatuses = statuses.filter(function (status, index, arr) {
+    return arr.indexOf(status) === index;
+  });
+
+  if (count > 1) {
+    return 'พบข้อมูล ' + count + ' รายการ: ' + uniqueStatuses.join(', ');
+  }
+
+  if (uniqueStatuses[0] === 'active') return 'พบข้อมูล: active';
+  if (uniqueStatuses[0] === 'inactive') return 'พบข้อมูล: inactive';
+  if (uniqueStatuses[0] === 'blacklist') return 'พบข้อมูล: blacklist';
+  return 'พบข้อมูล';
 }
 
 function getSuggestedPlateMatches(query) {

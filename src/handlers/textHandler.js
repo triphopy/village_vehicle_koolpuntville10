@@ -73,10 +73,11 @@ function handleTextMessage(context) {
     return;
   }
 
-  const result = query.match(/^\d/) && query.indexOf('/') !== -1
-    ? searchByHouse(query)
-    : searchByPlate(query);
+  const isHouseQuery = query.match(/^\d/) && query.indexOf('/') !== -1;
+  const result = isHouseQuery
+    ? searchByHouseDetailed(query)
+    : searchByPlateDetailed(query);
 
-  writeLog(userId, staff.name, lineName, query, result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
+  writeLog(userId, staff.name, lineName, query, result.logResult || (result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล'));
   replyToLine(replyToken, result.message);
 }
