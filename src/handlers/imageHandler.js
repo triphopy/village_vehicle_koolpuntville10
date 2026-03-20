@@ -29,7 +29,7 @@ function handleImageMessage(context) {
     writeLog(userId, staff.name, lineName, '[OCR] ส่งรูป', 'อ่านไม่ได้');
     replyToLine(
       replyToken,
-      '📷 อ่านทะเบียนไม่ได้ครับ\n\nกรุณาลองใหม่:\n• ถ่ายให้ใกล้และชัดขึ้น\n• แสงเพียงพอ\n• หรือพิมพ์เลขทะเบียนตรงๆ ได้เลยครับ'
+      '📷 อ่านป้ายไม่ชัด\nผลตรวจ: กรุณาถ่ายใหม่ หรือพิมพ์เลขทะเบียน'
     );
     return;
   }
