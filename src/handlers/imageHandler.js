@@ -35,6 +35,9 @@ function handleImageMessage(context) {
   }
 
   const exactPlate = findExactPlateMatch(plateText);
+  const warningNote = shouldWarnForAmbiguousPlate(plateText)
+    ? '⚠️ กรุณาตรวจตัวอักษรบนป้ายอีกครั้งก่อนอนุญาต\n\n'
+    : '';
   const ocrNote = '🔍 อ่านจากรูปได้: ' + plateText + '\n\n';
 
   if (!exactPlate) {
@@ -53,7 +56,7 @@ function handleImageMessage(context) {
       '[OCR] ' + plateText,
       logResult
     );
-    replyToLine(replyToken, ocrNote + suggestionMessage);
+    replyToLine(replyToken, ocrNote + warningNote + suggestionMessage);
     return;
   }
 
@@ -66,5 +69,9 @@ function handleImageMessage(context) {
     '[OCR] ' + plateText,
     result.found ? 'พบข้อมูลตรงตัว' : 'ไม่พบข้อมูล'
   );
-  replyToLine(replyToken, ocrNote + result.message);
+  replyToLine(replyToken, ocrNote + warningNote + result.message);
+}
+
+function shouldWarnForAmbiguousPlate(plateText) {
+  return /[อฮฬขช0OQDB8]/.test(plateText || '');
 }
