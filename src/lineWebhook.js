@@ -57,7 +57,9 @@ const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
 // ============================
 // 2. MAIN ENTRY POINT
 // ============================
-function doPost(e) {
+// Legacy entry retained temporarily during phase 1 refactor.
+// Active webhook flow now lives in src/webhook/* and src/handlers/*.
+function legacyDoPostMonolith(e) {
   try {
     const token = e && e.parameter ? e.parameter.token : null;
     if (token !== props.getProperty('WEBHOOK_SECRET')) {
