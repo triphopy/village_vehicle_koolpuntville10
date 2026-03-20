@@ -99,17 +99,7 @@ function cleanPlateText(rawText) {
 }
 
 function compactPlateText(text) {
-  return (text || '').toString().replace(/[\s\-]/g, '');
-}
-
-function normalizePlateForLookup(text) {
-  const compact = compactPlateText(text);
-  const thaiPlateMatch = compact.match(/^([ก-ฮ]{1,3})(\d{1,4})$/);
-  if (!thaiPlateMatch) return compact;
-
-  const prefix = thaiPlateMatch[1];
-  const digits = thaiPlateMatch[2].replace(/^0+/, '');
-  return prefix + (digits || '0');
+  return (text || '').toString().replace(/\s/g, '');
 }
 
 function fuzzySearchPlate(ocrText) {
@@ -152,13 +142,11 @@ function resolvePlateFromOcr(ocrText) {
 
 function findExactPlateMatch(text) {
   const target = compactPlateText(text);
-  const normalizedTarget = normalizePlateForLookup(text);
   if (!target) return null;
 
   const data = getCachedSheetData('Vehicles');
   const match = data.slice(1).find(function (row) {
-    return compactPlateText(row[COL_VEHICLE.PLATE]) === target ||
-      normalizePlateForLookup(row[COL_VEHICLE.PLATE]) === normalizedTarget;
+    return compactPlateText(row[COL_VEHICLE.PLATE]) === target;
   });
 
   return match ? compactPlateText(match[COL_VEHICLE.PLATE]) : null;
