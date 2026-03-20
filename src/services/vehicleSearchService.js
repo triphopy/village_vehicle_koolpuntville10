@@ -54,7 +54,9 @@ function searchByPlateDetailed(query, options) {
   });
 
   if (matches.length === 0) {
-    const suggestions = findSuggestedPlates(query, forcedSuggestions, 3);
+    const suggestions = findSuggestedPlates(query, forcedSuggestions, 3, {
+      allowContainsHint: source === 'text' && looksLikeFullPlate
+    });
     if (suggestions.length > 0) {
       const lines = [];
 
@@ -227,8 +229,9 @@ function formatVehicleLine(row) {
   return 'สี' + color;
 }
 
-function findSuggestedPlates(query, forcedSuggestions, limit) {
+function findSuggestedPlates(query, forcedSuggestions, limit, options) {
   const maxItems = limit || 3;
+  const opts = options || {};
   const queryCompact = compactPlateText(query).toUpperCase();
   const queryNormalized = normalizePlateForComparison(queryCompact);
   const unique = {};
@@ -243,6 +246,17 @@ function findSuggestedPlates(query, forcedSuggestions, limit) {
   }
 
   forcedSuggestions.forEach(pushSuggestion);
+
+  if (opts.allowContainsHint && queryCompact) {
+    const data = getCachedSheetData('Vehicles');
+    data.slice(1).forEach(function (row) {
+      const plate = compactPlateText(row[COL_VEHICLE.PLATE]).toUpperCase();
+      if (!plate || plate === queryCompact) return;
+      if (plate.indexOf(queryCompact) !== -1) {
+        pushSuggestion(plate);
+      }
+    });
+  }
 
   if (queryCompact) {
     const candidateMap = buildPlateCandidateMap();
