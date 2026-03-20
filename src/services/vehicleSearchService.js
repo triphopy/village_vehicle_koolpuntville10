@@ -29,11 +29,26 @@ function searchByPlateDetailed(query, options) {
   }
 
   const data = getCachedSheetData('Vehicles');
+  const exactMatches = data.slice(1).filter(function (row) {
+    return normalizePlateSearchText(row[COL_VEHICLE.PLATE]) === normalizedQuery;
+  });
+
+  if (exactMatches.length > 0) {
+    const exactMessage = buildPlateMatchMessage(exactMatches);
+    const exactStatuses = exactMatches.map(function (row) {
+      return ((row[COL_VEHICLE.STATUS] || '') + '').toLowerCase() || 'unknown';
+    });
+
+    return {
+      found: true,
+      message: exactMessage,
+      logResult: buildPlateLogResult(exactStatuses)
+    };
+  }
+
   const matches = data.slice(1).filter(function (row) {
     const normalizedPlate = normalizePlateSearchText(row[COL_VEHICLE.PLATE]);
-    return source === 'ocr'
-      ? normalizedPlate === normalizedQuery
-      : normalizedPlate.includes(normalizedQuery);
+    return source === 'ocr' ? false : normalizedPlate.includes(normalizedQuery);
   });
 
   if (matches.length === 0) {
