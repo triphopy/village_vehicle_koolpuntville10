@@ -9,7 +9,7 @@ function searchByPlate(query) {
   if (matches.length === 0) {
     return {
       found: false,
-      message: '❌ ไม่พบข้อมูลรถในระบบ\nกรุณาแลกบัตรตามขั้นตอนปกติ'
+      message: '❌ ไม่พบข้อมูลรถในระบบ\nกรุณาแลกบัตรตามขั้นตอนปกติ\n\nผลตรวจ: ไม่พบข้อมูล ให้แลกบัตร'
     };
   }
 
@@ -17,7 +17,8 @@ function searchByPlate(query) {
     '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
     '    ' + row[COL_VEHICLE.BRAND] + ' ' + row[COL_VEHICLE.MODEL] + ' | สี' + row[COL_VEHICLE.COLOR] + '\n' +
     '🏠 บ้านเลขที่: ' + row[COL_VEHICLE.HOUSE] + '\n' +
-    getStatusLabel(row[COL_VEHICLE.STATUS])
+    getStatusLabel(row[COL_VEHICLE.STATUS]) + '\n' +
+    getDecisionLabel(row[COL_VEHICLE.STATUS])
   ).join('\n\n');
 
   const header = matches.length > 1
@@ -50,14 +51,15 @@ function searchByHouse(query) {
   if (matches.length === 0) {
     return {
       found: false,
-      message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ'
+      message: '❌ ไม่พบข้อมูลบ้านเลขที่นี้ในระบบ\n\nผลตรวจ: ไม่พบข้อมูล'
     };
   }
 
   const msg = matches.map(row =>
     '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
     '    ' + row[COL_VEHICLE.BRAND] + ' ' + row[COL_VEHICLE.MODEL] + ' | สี' + row[COL_VEHICLE.COLOR] + '\n' +
-    getStatusLabel(row[COL_VEHICLE.STATUS])
+    getStatusLabel(row[COL_VEHICLE.STATUS]) + '\n' +
+    getDecisionLabel(row[COL_VEHICLE.STATUS])
   ).join('\n\n');
 
   return { found: true, message: '🏠 บ้านเลขที่ ' + q + ' พบรถ ' + matches.length + ' คัน\n\n' + msg };
@@ -69,4 +71,12 @@ function getStatusLabel(status) {
   if (s === 'inactive') return '⛔ สถานะ: ไม่อนุญาต';
   if (s === 'blacklist') return '🚨 สถานะ: Blacklist';
   return '❓ สถานะ: ไม่ระบุ';
+}
+
+function getDecisionLabel(status) {
+  const s = (status || '').toString().toLowerCase();
+  if (s === 'active') return 'ผลตรวจ: เข้าได้';
+  if (s === 'inactive') return 'ผลตรวจ: ไม่อนุญาต';
+  if (s === 'blacklist') return 'ผลตรวจ: ห้ามเข้า';
+  return 'ผลตรวจ: กรุณาตรวจสอบข้อมูล';
 }
