@@ -260,7 +260,9 @@ function isPartialPlateQuery(query) {
   if (/^\d{4}$/.test(normalized)) return false;
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return false;
   if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return false;
-  return /[ก-ฮ]/.test(normalized) && /\d/.test(normalized);
+  const thaiMatches = normalized.match(/[ก-ฮ]/g) || [];
+  const digitMatches = normalized.match(/\d/g) || [];
+  return thaiMatches.length >= 2 && digitMatches.length >= 2;
 }
 
 function looksLikePlateQuery(normalized) {
