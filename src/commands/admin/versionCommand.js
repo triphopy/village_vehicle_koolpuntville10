@@ -9,13 +9,12 @@
  *   GITHUB_REPO  — ตั้งเองครั้งเดียว (เช่น triphopy/village_vehicle_koolpuntville10)
  */
 function runVersionCommand() {
-  const p          = PropertiesService.getScriptProperties();
-  const version    = p.getProperty('APP_VERSION') || 'N/A';
-  const env        = p.getProperty('DEPLOY_ENV')  || 'N/A';
-  const deployTime = p.getProperty('DEPLOY_TIME') || 'N/A';
-  const repo       = p.getProperty('GITHUB_REPO') || '';
+  const version    = VERSION_INFO.version    || 'N/A';
+  const env        = VERSION_INFO.env        || 'N/A';
+  const deployTime = VERSION_INFO.deployTime || 'N/A';
+  const repo       = PropertiesService.getScriptProperties()
+                       .getProperty('GITHUB_REPO') || '';
 
-  // แยก SHA 7 ตัว จาก version string เช่น "main-a1b2c3d" → "a1b2c3d"
   const currentSha = version.includes('-') ? version.split('-').pop() : '';
 
   const lines = [
@@ -26,10 +25,8 @@ function runVersionCommand() {
     '🕐 Deployed   : ' + deployTime,
   ];
 
-  // เทียบกับ GitHub main branch
   if (repo && currentSha) {
     const latestSha = getLatestMainSha(repo);
-
     if (!latestSha) {
       lines.push('', '⚠️ ไม่สามารถตรวจสอบ version ล่าสุดได้');
     } else if (latestSha.startsWith(currentSha)) {
@@ -45,10 +42,6 @@ function runVersionCommand() {
   return lines.join('\n');
 }
 
-/**
- * ดึง latest commit SHA จาก GitHub API (main branch)
- * GET https://api.github.com/repos/{owner}/{repo}/commits/main
- */
 function getLatestMainSha(repo) {
   try {
     const url = 'https://api.github.com/repos/' + repo + '/commits/main';
@@ -56,11 +49,8 @@ function getLatestMainSha(repo) {
       headers: { 'User-Agent': 'GAS-VersionChecker' },
       muteHttpExceptions: true
     });
-
     if (res.getResponseCode() !== 200) return null;
-
-    const json = JSON.parse(res.getContentText());
-    return json.sha || null;
+    return JSON.parse(res.getContentText()).sha || null;
   } catch (e) {
     console.error('getLatestMainSha error: ' + e);
     return null;
