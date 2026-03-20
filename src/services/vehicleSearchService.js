@@ -9,6 +9,7 @@ function searchByPlateDetailed(query, options) {
   const normalizedQuery = normalizePlateSearchText(query);
   const isPartialQuery = source === 'text' && isPartialPlateQuery(query);
   const isTailQuery = source === 'text' && isTailNumberSearchQuery(query);
+  const looksLikeFullPlate = looksLikeFullPlateQuery(query);
 
   if (!normalizedQuery) {
     return {
@@ -46,9 +47,10 @@ function searchByPlateDetailed(query, options) {
     };
   }
 
+  const allowContainsSearch = source === 'text' && (isPartialQuery || isTailQuery);
   const matches = data.slice(1).filter(function (row) {
     const normalizedPlate = normalizePlateSearchText(row[COL_VEHICLE.PLATE]);
-    return source === 'ocr' ? false : normalizedPlate.includes(normalizedQuery);
+    return allowContainsSearch ? normalizedPlate.includes(normalizedQuery) : false;
   });
 
   if (matches.length === 0) {
@@ -69,6 +71,8 @@ function searchByPlateDetailed(query, options) {
       lines.push(
         source === 'ocr'
           ? 'ผลตรวจ: กรุณาตรวจป้ายอีกครั้ง'
+          : looksLikeFullPlate
+            ? 'ผลตรวจ: กรุณาตรวจทะเบียนอีกครั้ง'
           : isTailQuery
             ? 'ผลตรวจ: กรุณาตรวจทะเบียนให้ตรงอีกครั้ง'
             : isPartialQuery
@@ -296,6 +300,14 @@ function isValidPlateSearchQuery(query) {
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
   if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
   if (isPartialPlateQuery(query)) return true;
+  return false;
+}
+
+function looksLikeFullPlateQuery(query) {
+  const normalized = normalizePlateSearchText(query).toUpperCase();
+  if (!normalized) return false;
+  if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
+  if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
   return false;
 }
 
