@@ -389,18 +389,9 @@ function getCachedSheetData(sheetName) {
 
 function getStaff(userId) {
   if (!userId) return null;
-
-  const adminUids = (props.getProperty('ADMIN_UIDS') || '')
-                      .split(',')
-                      .map(u => u.trim());
-
   const cache  = CacheService.getScriptCache();
   const cached = cache.get('staff_' + userId);
-  if (cached) {
-    const staff = JSON.parse(cached);
-    if (staff && adminUids.includes(userId)) staff.role = 'admin';
-    return staff;
-  }
+  if (cached) return JSON.parse(cached);
 
   const data = getCachedSheetData('Staff');
   const row  = data.find(r =>
@@ -409,10 +400,7 @@ function getStaff(userId) {
   );
 
   if (row) {
-    const staff = {
-      name: row[0],
-      role: adminUids.includes(userId) ? 'admin' : row[3].toString().toLowerCase()
-    };
+    const staff = { name: row[0], role: row[3].toString().toLowerCase() };
     cache.put('staff_' + userId, JSON.stringify(staff), CACHE_TIME);
     return staff;
   }
