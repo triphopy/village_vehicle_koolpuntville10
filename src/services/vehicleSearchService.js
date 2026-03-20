@@ -7,6 +7,7 @@ function searchByPlateDetailed(query, options) {
   const source = opts.source || 'text';
   const forcedSuggestions = opts.forcedSuggestions || [];
   const normalizedQuery = normalizePlateSearchText(query);
+  const isPartialQuery = source === 'text' && isPartialPlateQuery(query);
 
   if (!normalizedQuery) {
     return {
@@ -38,14 +39,19 @@ function searchByPlateDetailed(query, options) {
     const suggestions = findSuggestedPlates(query, forcedSuggestions, 3);
     if (suggestions.length > 0) {
       const lines = [
+        isPartialQuery
+          ? '🔎 ค้นหาจากทะเบียนบางส่วน: ' + compactPlateText(query)
+          : null,
         source === 'ocr' ? '❌ ไม่พบข้อมูลตรงตัวในระบบ' : '❌ ไม่พบข้อมูลรถในระบบ',
         '',
         'ใกล้เคียงที่อาจเป็น:',
         suggestions.map(function (plate) { return '• ' + plate; }).join('\n'),
         source === 'ocr'
           ? 'ผลตรวจ: กรุณาตรวจป้ายอีกครั้ง'
+          : isPartialQuery
+            ? 'ผลตรวจ: กรุณาตรวจทะเบียนให้ครบอีกครั้ง'
           : 'ผลตรวจ: กรุณาตรวจทะเบียนอีกครั้ง'
-      ];
+      ].filter(function (line) { return line !== null; });
 
       return {
         found: false,
@@ -60,6 +66,14 @@ function searchByPlateDetailed(query, options) {
         ? '❌ ไม่พบข้อมูลตรงตัวในระบบ\nผลตรวจ: ให้แลกบัตร'
         : '❌ ไม่พบข้อมูลรถในระบบ\nผลตรวจ: ให้แลกบัตร',
       logResult: 'ไม่พบข้อมูล'
+    };
+  }
+
+  if (isPartialQuery) {
+    return {
+      found: false,
+      message: buildPartialPlateMessage(query, matches),
+      logResult: 'ค้นหาทะเบียนบางส่วน: พบ ' + matches.length + ' รายการ'
     };
   }
 
@@ -134,6 +148,22 @@ function buildPlateMatchMessage(matches) {
     : '✅ พบข้อมูลในระบบ\n\n';
 
   return header + msg;
+}
+
+function buildPartialPlateMessage(query, matches) {
+  const compactQuery = compactPlateText(query);
+  const list = matches.slice(0, 5).map(function (row) {
+    return '• ' + row[COL_VEHICLE.PLATE];
+  }).join('\n');
+  const extraCount = matches.length - Math.min(matches.length, 5);
+  const extraLine = extraCount > 0 ? '\n• และอีก ' + extraCount + ' รายการ' : '';
+
+  return '🔎 ค้นหาจากทะเบียนบางส่วน: ' + compactQuery + '\n\n' +
+    '⚠️ กรุณาตรวจทะเบียนให้ครบอีกครั้ง\n' +
+    'พบข้อมูลที่ใกล้เคียง:\n' +
+    list +
+    extraLine +
+    '\n\nผลตรวจ: กรุณาตรวจทะเบียนให้ครบอีกครั้ง';
 }
 
 function formatVehicleLine(row) {
@@ -221,6 +251,15 @@ function isValidPlateSearchQuery(query) {
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
   if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
   return false;
+}
+
+function isPartialPlateQuery(query) {
+  const normalized = normalizePlateSearchText(query).toUpperCase();
+  if (!normalized) return false;
+  if (/^\d{4}$/.test(normalized)) return false;
+  if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return false;
+  if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return false;
+  return /[ก-ฮ]/.test(normalized) && /\d/.test(normalized);
 }
 
 function looksLikePlateQuery(normalized) {
