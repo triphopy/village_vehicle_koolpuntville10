@@ -22,7 +22,9 @@ function extractPlateFromImage(imageId) {
 
     const firstPass = requestPlateOcr(imageBlob, buildOcrPrompt(), undefined, steps);
     if (!firstPass || firstPass.toLowerCase() === 'null') {
-      LAST_OCR_STATUS = 'no_text';
+      if (LAST_OCR_STATUS === 'idle') {
+        LAST_OCR_STATUS = 'no_text';
+      }
       pushOcrDebugStep(steps, 'result', 'ocr returned null');
       flushOcrDebugSummary(steps);
       return null;
@@ -31,7 +33,9 @@ function extractPlateFromImage(imageId) {
     const cleanedFirstPass = cleanPlateText(firstPass);
     pushOcrDebugStep(steps, 'clean', safeDebugValue(cleanedFirstPass));
     if (!cleanedFirstPass) {
-      LAST_OCR_STATUS = 'no_text';
+      if (LAST_OCR_STATUS === 'idle') {
+        LAST_OCR_STATUS = 'no_text';
+      }
       pushOcrDebugStep(steps, 'result', 'cleanPlateText returned null');
       flushOcrDebugSummary(steps);
       return null;
