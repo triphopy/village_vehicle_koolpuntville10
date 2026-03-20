@@ -4,35 +4,53 @@
  * @returns {string|null}
  */
 function extractPlateFromImage(imageId) {
+  const steps = [];
   try {
     LAST_OCR_STATUS = 'idle';
-    if (!LINE_ACCESS_TOKEN || !GEMINI_API_KEY) return null;
+    if (!LINE_ACCESS_TOKEN || !GEMINI_API_KEY) {
+      pushOcrDebugStep(steps, 'config', 'missing token or api key');
+      flushOcrDebugSummary(steps);
+      return null;
+    }
+    pushOcrDebugStep(steps, 'start', 'imageId=' + imageId);
 
-    const imageBlob = fetchLineImageBlob(imageId);
-    if (!imageBlob) return null;
+    const imageBlob = fetchLineImageBlob(imageId, steps);
+    if (!imageBlob) {
+      flushOcrDebugSummary(steps);
+      return null;
+    }
 
-    const firstPass = requestPlateOcr(imageBlob, buildOcrPrompt());
+    const firstPass = requestPlateOcr(imageBlob, buildOcrPrompt(), undefined, steps);
     if (!firstPass || firstPass.toLowerCase() === 'null') {
       LAST_OCR_STATUS = 'no_text';
+      pushOcrDebugStep(steps, 'result', 'ocr returned null');
+      flushOcrDebugSummary(steps);
       return null;
     }
 
     const cleanedFirstPass = cleanPlateText(firstPass);
+    pushOcrDebugStep(steps, 'clean', safeDebugValue(cleanedFirstPass));
     if (!cleanedFirstPass) {
       LAST_OCR_STATUS = 'no_text';
+      pushOcrDebugStep(steps, 'result', 'cleanPlateText returned null');
+      flushOcrDebugSummary(steps);
       return null;
     }
 
     LAST_OCR_STATUS = 'success';
+    pushOcrDebugStep(steps, 'result', 'success=' + cleanedFirstPass);
+    flushOcrDebugSummary(steps);
     return cleanedFirstPass;
   } catch (err) {
     LAST_OCR_STATUS = 'exception';
     console.error('extractPlateFromImage Error: ' + err.message);
+    pushOcrDebugStep(steps, 'exception', err.message);
+    flushOcrDebugSummary(steps);
     return null;
   }
 }
 
-function fetchLineImageBlob(imageId) {
+function fetchLineImageBlob(imageId, steps) {
   const imageResponse = UrlFetchApp.fetch(
     'https://api-data.line.me/v2/bot/message/' + imageId + '/content',
     {
@@ -44,13 +62,16 @@ function fetchLineImageBlob(imageId) {
   if (imageResponse.getResponseCode() !== 200) {
     LAST_OCR_STATUS = 'line_error';
     console.error('LINE Content API Error: ' + imageResponse.getContentText());
+    pushOcrDebugStep(steps, 'line', 'status=' + imageResponse.getResponseCode());
     return null;
   }
 
-  return imageResponse.getBlob();
+  const blob = imageResponse.getBlob();
+  pushOcrDebugStep(steps, 'line', 'status=200 mime=' + (blob.getContentType() || 'unknown') + ' bytes=' + blob.getBytes().length);
+  return blob;
 }
 
-function requestPlateOcr(imageBlob, promptText, maxOutputTokens) {
+function requestPlateOcr(imageBlob, promptText, maxOutputTokens, steps) {
   const response = UrlFetchApp.fetch(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY,
     {
@@ -82,17 +103,20 @@ function requestPlateOcr(imageBlob, promptText, maxOutputTokens) {
   if (response.getResponseCode() === 429) {
     LAST_OCR_STATUS = 'gemini_rate_limit';
     console.error('Gemini API Rate Limit: ' + response.getContentText());
+    pushOcrDebugStep(steps, 'gemini', 'status=429 rate_limit');
     return null;
   }
 
+  pushOcrDebugStep(steps, 'gemini', 'status=' + response.getResponseCode());
   const json = JSON.parse(response.getContentText());
   if (json.error) {
     LAST_OCR_STATUS = classifyGeminiError(json.error);
     console.error('Gemini API Error: ' + JSON.stringify(json.error));
+    pushOcrDebugStep(steps, 'gemini_error', truncateDebugText(JSON.stringify(json.error), 160));
     return null;
   }
 
-  return json.candidates &&
+  const text = json.candidates &&
     json.candidates[0] &&
     json.candidates[0].content &&
     json.candidates[0].content.parts &&
@@ -100,6 +124,8 @@ function requestPlateOcr(imageBlob, promptText, maxOutputTokens) {
     json.candidates[0].content.parts[0].text
       ? json.candidates[0].content.parts[0].text.trim()
       : null;
+  pushOcrDebugStep(steps, 'gemini_text', safeDebugValue(text));
+  return text;
 }
 
 function buildOcrPrompt() {
@@ -354,4 +380,24 @@ function editDistance(a, b) {
     }
   }
   return dp[b.length];
+}
+
+function pushOcrDebugStep(steps, label, value) {
+  if (!steps) return;
+  steps.push(label + '=' + truncateDebugText(value, 180));
+}
+
+function flushOcrDebugSummary(steps) {
+  if (!steps || steps.length === 0) return;
+  debugToLine('[OCR DEBUG]\n' + steps.join('\n'));
+}
+
+function safeDebugValue(value) {
+  if (value === null || value === undefined) return 'null';
+  return String(value);
+}
+
+function truncateDebugText(text, maxLen) {
+  const value = safeDebugValue(text);
+  return value.length > maxLen ? value.substring(0, maxLen) + '...' : value;
 }
