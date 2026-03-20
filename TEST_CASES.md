@@ -1,0 +1,470 @@
+# LINE/GAS Test Cases
+
+เอกสารนี้ใช้สำหรับทดสอบระบบ Vehicle Verification System แบบทีละเคสหลัง deploy หรือหลังแก้โค้ด
+
+## Test Setup
+
+เตรียมข้อมูลก่อนเริ่มทดสอบ
+
+- มี user ในชีต `Staff` อย่างน้อย 3 แบบ
+- `admin_user` สถานะ `active`, role `admin`
+- `staff_user` สถานะ `active`, role `staff`
+- `inactive_user` สถานะ `inactive`, role ใดก็ได้
+- มีข้อมูลในชีต `Vehicles` อย่างน้อยดังนี้
+
+```text
+PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
+กข1234      Toyota  Yaris   ขาว    1/23     A       active
+1กข2345     Honda   City    ดำ     1/24     B       inactive
+80-1234     Isuzu   Dmax    เทา    2/10     C       active
+```
+
+- ใน Script Properties มีค่า `ALLOWED_GROUP_IDS`
+- bot ถูกเชิญเข้า group ทดสอบที่อยู่ใน allowlist แล้ว
+- มี Web App URL สำหรับยิงทดสอบ webhook
+
+## LINE Command Tests
+
+### TC-01 `/help` สำหรับ admin
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/help
+```
+
+- คาดหวัง:
+- เห็น `/myid`, `/help`
+- เห็น admin commands เช่น `/add`, `/remove`, `/setstatus`, `/setrole`, `/list`, `/status`, `/whois`, `/visitors`, `/log`, `/clearcache`
+
+### TC-02 `/help` สำหรับ staff
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+/help
+```
+
+- คาดหวัง:
+- เห็นเฉพาะคำสั่งทั่วไป
+- ไม่เห็น admin commands
+
+### TC-03 `/myid` ในแชตส่วนตัว
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+/myid
+```
+
+- คาดหวัง:
+- มี `User ID`
+- มีชื่อและ role
+- ไม่มี `Group ID`
+
+### TC-04 `/myid` ใน group ที่อนุญาต
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งใน group ที่อนุญาต:
+
+```text
+/myid
+```
+
+- คาดหวัง:
+- มี `User ID`
+- มี `Group ID`
+
+### TC-05 staff ใช้งานนอก group ที่อนุญาต
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งในห้องที่ไม่อยู่ใน `ALLOWED_GROUP_IDS`:
+
+```text
+กข1234
+```
+
+- คาดหวัง:
+- ระบบตอบปฏิเสธการใช้งานในกลุ่มที่ไม่ได้กำหนด
+
+### TC-06 admin ใช้งานนอก group ที่อนุญาต
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+กข1234
+```
+
+- คาดหวัง:
+- ค้นหาได้ปกติ
+
+### TC-07 ค้นหาทะเบียนแบบตรงตัว
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+กข1234
+```
+
+- คาดหวัง:
+- พบข้อมูลรถ
+- แสดงยี่ห้อ รุ่น สี บ้านเลขที่ และสถานะ
+
+### TC-08 ค้นหาทะเบียนที่ไม่มี
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+กก9999
+```
+
+- คาดหวัง:
+- ตอบว่าไม่พบทะเบียนในระบบ
+
+### TC-09 ค้นหาทะเบียนเลขล้วนมีขีด
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+80-1234
+```
+
+- คาดหวัง:
+- พบข้อมูลรถคันที่ตรงกัน
+
+### TC-10 ค้นหาบ้านเลขที่
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+1/23
+```
+
+- คาดหวัง:
+- พบรถของบ้านเลขที่นั้น
+
+### TC-11 ข้อความยาวเกิน limit
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+123456789012345678901234567890123456789012345678901
+```
+
+- คาดหวัง:
+- ตอบว่าข้อความยาวเกินไป
+
+### TC-12 staff เรียก admin command
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+/list
+```
+
+- คาดหวัง:
+- ตอบว่าคำสั่งนี้สำหรับ Admin เท่านั้น
+
+### TC-13 `/status` ของ user active
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/status <admin_user_id>
+```
+
+- คาดหวัง:
+- แสดงชื่อ
+- แสดง role
+- แสดง `Status: active`
+
+### TC-14 `/status` ของ user inactive
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/status <inactive_user_id>
+```
+
+- คาดหวัง:
+- แสดงชื่อจริงของ user
+- แสดง `Status: inactive`
+- ไม่ตอบว่า “ไม่พบ”
+
+### TC-15 `/status` ของ user ที่ไม่มีในระบบ
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/status U_NOT_FOUND
+```
+
+- คาดหวัง:
+- ตอบว่าไม่พบ User ID นี้ในระบบ
+
+### TC-16 `/log` แบบปกติ
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/log 5
+```
+
+- คาดหวัง:
+- แสดง log ล่าสุด 5 รายการหรือน้อยกว่า
+- ไม่เกิด error
+
+### TC-17 `/log` ใส่ค่ามั่ว
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/log abc
+```
+
+- คาดหวัง:
+- ไม่พัง
+- ใช้ค่า default แทน
+
+### TC-18 `/log` เกิน limit
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/log 999
+```
+
+- คาดหวัง:
+- ไม่พัง
+- จำกัดจำนวนสูงสุดตามที่ระบบกำหนด
+
+### TC-19 `/visitors` แสดงผู้ใช้เคยเข้าระบบ
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/visitors
+```
+
+- คาดหวัง:
+- เห็น user ที่เคยส่งข้อความเข้า bot
+- มี `last:` ของแต่ละคน
+
+### TC-20 ทดสอบ `last seen` ขยับจริง
+
+- ผู้ทดสอบ: `staff_user`
+- ขั้นตอน:
+
+```text
+1. ส่ง "กข1234"
+2. รอ 2-3 นาที
+3. ส่ง "1/23"
+4. ให้ admin ส่ง "/visitors"
+```
+
+- คาดหวัง:
+- `last seen` เป็นเวลาล่าสุดจากข้อความรอบสอง ไม่ใช่เวลารอบแรก
+
+## OCR Tests
+
+### TC-21 OCR รูป JPG ชัดเจน
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งรูป JPG ป้าย `กข1234`
+- คาดหวัง:
+- bot ตอบว่า OCR อ่านได้
+- พบข้อมูลรถในระบบ
+
+### TC-22 OCR รูป PNG ชัดเจน
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งรูป PNG ป้าย `กข1234`
+- คาดหวัง:
+- bot ไม่ fail เพราะ mime type
+- พบข้อมูลรถในระบบ
+
+### TC-23 OCR รูปทะเบียน `80-1234`
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งรูปทะเบียน `80-1234`
+- คาดหวัง:
+- OCR อ่านได้
+- ค้นหาเจอรายการรถ
+
+### TC-24 OCR รูปไม่ชัด
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งรูปเบลอหรือมืดมาก
+- คาดหวัง:
+- bot ตอบว่าอ่านทะเบียนไม่ได้
+- ไม่มี exception หลุดจนระบบเงียบ
+
+### TC-25 OCR จาก user ไม่มีสิทธิ์
+
+- ผู้ทดสอบ: user ที่ไม่อยู่ใน `Staff`
+- ส่งรูปทะเบียน
+- คาดหวัง:
+- bot ตอบว่าไม่มีสิทธิ์เข้าถึงระบบ
+
+### TC-26 OCR จาก staff ใน group ที่ไม่อนุญาต
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งรูปในกลุ่มที่ไม่อยู่ใน allowlist
+- คาดหวัง:
+- bot ปฏิเสธการใช้งาน
+
+## Admin Mutation Tests
+
+### TC-27 เพิ่ม staff ใหม่
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/add <new_user_id> ทดสอบ staff
+```
+
+- คาดหวัง:
+- ตอบว่าเพิ่มสำเร็จ
+- `/status <new_user_id>` เห็น `active`
+
+### TC-28 เปลี่ยน status เป็น inactive
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/setstatus <new_user_id> inactive
+```
+
+- คาดหวัง:
+- ตอบว่าเปลี่ยนสำเร็จ
+- `/status <new_user_id>` แสดง `inactive`
+- user นี้ค้นหาทะเบียนต่อไม่ได้
+
+### TC-29 เปลี่ยน role เป็น admin
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/setrole <new_user_id> admin
+```
+
+- คาดหวัง:
+- ตอบว่าเปลี่ยนสำเร็จ
+- `/status <new_user_id>` แสดง role เป็น `admin`
+
+### TC-30 ลบ user
+
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/remove <new_user_id>
+```
+
+- คาดหวัง:
+- ตอบว่าลบสำเร็จ
+- `/status <new_user_id>` ต้องไม่พบ
+
+## GAS / Webhook Tests
+
+### TC-31 เรียก webhook โดยไม่มี `token`
+
+- เครื่องมือ: Postman หรือ `curl`
+- ส่ง `POST` ไป Web App URL โดยไม่มี query `token`
+- body:
+
+```json
+{"events":[]}
+```
+
+- คาดหวัง:
+- response เป็น `Unauthorized`
+
+### TC-32 เรียก webhook ด้วย `token` ผิด
+
+- เครื่องมือ: Postman หรือ `curl`
+- body:
+
+```json
+{"events":[]}
+```
+
+- คาดหวัง:
+- response เป็น `Unauthorized`
+
+### TC-33 เรียก webhook ด้วย `token` ถูก แต่ body ว่าง
+
+- เครื่องมือ: Postman หรือ `curl`
+- ส่ง `POST` ที่ไม่มี JSON body
+- คาดหวัง:
+- response เป็น `Bad Request`
+- ไม่มี exception ใน execution log
+
+### TC-34 เรียก webhook ด้วย `token` ถูก และ `events` ว่าง
+
+- เครื่องมือ: Postman หรือ `curl`
+- body:
+
+```json
+{"events":[]}
+```
+
+- คาดหวัง:
+- response เป็น `OK`
+
+### TC-35 เช็ก execution log ตอน OCR ล้มเหลว
+
+- ตั้ง `GEMINI_API_KEY` ให้ผิดชั่วคราว
+- ส่งรูปเข้า bot
+- คาดหวัง:
+- bot ตอบว่าอ่านไม่ได้
+- ไม่มี script crash
+- มี log สำหรับ debug
+
+## Curl Examples
+
+แทนค่า `<WEB_APP_URL>` และ `<WEBHOOK_SECRET>`
+
+### ไม่มี token
+
+```bash
+curl -X POST "<WEB_APP_URL>" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"events\":[]}"
+```
+
+### token ผิด
+
+```bash
+curl -X POST "<WEB_APP_URL>?token=wrong-token" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"events\":[]}"
+```
+
+### token ถูก
+
+```bash
+curl -X POST "<WEB_APP_URL>?token=<WEBHOOK_SECRET>" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"events\":[]}"
+```

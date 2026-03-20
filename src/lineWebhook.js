@@ -59,13 +59,16 @@ const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
 // ============================
 function doPost(e) {
   try {
-
-    const token = e.parameter.token;
+    const token = e && e.parameter ? e.parameter.token : null;
     if (token !== props.getProperty('WEBHOOK_SECRET')) {
       return ContentService.createTextOutput('Unauthorized');
     }
 
     debugToLine(JSON.stringify(e, null, 2));
+
+    if (!e || !e.postData || !e.postData.contents) {
+      return ContentService.createTextOutput('Bad Request');
+    }
 
     const data = JSON.parse(e.postData.contents);
     if (!data.events) return ContentService.createTextOutput('OK');
@@ -229,14 +232,23 @@ function doPost(e) {
  */
 function extractPlateFromImage(imageId) {
   try {
+    if (!LINE_ACCESS_TOKEN || !GEMINI_API_KEY) return null;
+
     // 1. ดึงรูปจาก LINE Content API
-    const imageBlob = UrlFetchApp.fetch(
+    const imageResponse = UrlFetchApp.fetch(
       'https://api-data.line.me/v2/bot/message/' + imageId + '/content',
       {
         headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN },
         muteHttpExceptions: true
       }
-    ).getBlob();
+    );
+
+    if (imageResponse.getResponseCode() !== 200) {
+      console.error('LINE Content API Error: ' + imageResponse.getContentText());
+      return null;
+    }
+
+    const imageBlob = imageResponse.getBlob();
 
     // 2. แปลงเป็น base64
     const base64 = Utilities.base64Encode(imageBlob.getBytes());
@@ -253,7 +265,7 @@ function extractPlateFromImage(imageId) {
             parts: [
               {
                 inline_data: {
-                  mime_type: 'image/jpeg',
+                  mime_type: imageBlob.getContentType() || 'image/jpeg',
                   data: base64
                 }
               },
@@ -307,18 +319,20 @@ function extractPlateFromImage(imageId) {
 function cleanPlateText(rawText) {
   if (!rawText) return null;
 
-  const cleaned = rawText.replace(/[\s\-]/g, '');
+  const original = rawText.trim();
+  const cleaned  = original.replace(/[\s\-]/g, '');
 
   const patterns = [
     /^[ก-ฮ]{1,3}\d{1,4}$/,       // กข1234, กขค123
     /^\d{1,2}[ก-ฮ]{1,2}\d{4}$/,  // 1กข2345
-    /^\d{1,2}-\d{4}$/             // 80-1234
+    /^\d{1,2}\d{4}$/              // 801234
   ];
 
+  if (/^\d{1,2}-\d{4}$/.test(original)) return original;
   if (patterns.some(p => p.test(cleaned))) return cleaned;
 
   // ถ้าไม่ตรง pattern → ลองดึงส่วนที่น่าจะเป็นทะเบียน
-  const extracted = cleaned.match(/[ก-ฮ]{1,3}\d{1,4}/);
+  const extracted = cleaned.match(/[ก-ฮ]{1,3}\d{1,4}|\d{1,2}[ก-ฮ]{1,2}\d{4}|\d{1,2}\d{4}/);
   return extracted ? extracted[0] : null;
 }
 
@@ -464,9 +478,9 @@ function handleAdminCommand(query, adminId, event) {
     case '/status': {
       if (parts.length < 2) return '❌ รูปแบบ:\n/status <userId>';
       const checkId     = parts[1].trim();
-      const targetStaff = getStaff(checkId);
-      if (!targetStaff) return '❌ ไม่พบ User ID นี้ในระบบ หรือ status ไม่ใช่ active';
-      return '📋 ' + targetStaff.name + '\nRole: ' + targetStaff.role + '\nStatus: active';
+      const targetStaff = getStaffRecord(checkId);
+      if (!targetStaff) return '❌ ไม่พบ User ID นี้ในระบบ';
+      return '📋 ' + targetStaff.name + '\nRole: ' + targetStaff.role + '\nStatus: ' + targetStaff.status;
     }
 
     case '/whois': {
@@ -504,7 +518,8 @@ function handleAdminCommand(query, adminId, event) {
     }
 
     case '/log': {
-      const limit    = Math.min(parts[1] ? parseInt(parts[1]) : 5, 20);
+      const parsedLimit = parts[1] ? parseInt(parts[1], 10) : 5;
+      const limit       = Math.max(1, Math.min(isNaN(parsedLimit) ? 5 : parsedLimit, 20));
       const sheet    = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Log');
       const values   = sheet.getDataRange().getValues();
       const dataRows = values.slice(1);
@@ -530,9 +545,11 @@ function handleAdminCommand(query, adminId, event) {
       const keys   = ['vehicles'];
       for (let i = 1; i < values.length; i++) {
         if (values[i][COL_STAFF.UID]) {
-          keys.push('staff_'   + values[i][COL_STAFF.UID].toString().trim());
-          keys.push('name_'    + values[i][COL_STAFF.UID].toString().trim());
-          keys.push('tracked_' + values[i][COL_STAFF.UID].toString().trim());
+          const uid = values[i][COL_STAFF.UID].toString().trim();
+          keys.push('staff_' + uid);
+          keys.push('staff_record_' + uid);
+          keys.push('name_' + uid);
+          keys.push('tracked_' + uid);
         }
       }
       CacheService.getScriptCache().removeAll(keys);
@@ -612,34 +629,42 @@ function getCachedSheetData(sheetName) {
 }
 
 function getStaff(userId) {
+  const staff = getStaffRecord(userId);
+  if (!staff || staff.status !== 'active') return null;
+  return {
+    name: staff.name,
+    role: staff.role
+  };
+}
+
+function getStaffRecord(userId) {
   if (!userId) return null;
 
   const cache  = CacheService.getScriptCache();
-  const cached = cache.get('staff_' + userId);
+  const cached = cache.get('staff_record_' + userId);
   if (cached) return JSON.parse(cached);
 
   const data = getCachedSheetData('Staff');
-  const row  = data.find(r =>
-    r[COL_STAFF.UID].toString().trim() === userId &&
-    r[COL_STAFF.STATUS].toString().trim().toLowerCase() === 'active'
-  );
+  const row  = data.find(r => r[COL_STAFF.UID].toString().trim() === userId);
 
   if (row) {
     const staff = {
       name: row[COL_STAFF.NAME],
-      role: row[COL_STAFF.ROLE].toString().toLowerCase()
+      role: row[COL_STAFF.ROLE].toString().toLowerCase(),
+      status: row[COL_STAFF.STATUS].toString().trim().toLowerCase()
     };
-    cache.put('staff_' + userId, JSON.stringify(staff), CACHE_TIME);
+    cache.put('staff_record_' + userId, JSON.stringify(staff), CACHE_TIME);
     return staff;
   }
 
-  cache.put('staff_' + userId, JSON.stringify(null), 300);
+  cache.put('staff_record_' + userId, JSON.stringify(null), 300);
   return null;
 }
 
 function clearStaffCache(userId) {
   const cache = CacheService.getScriptCache();
-  cache.remove('staff_'  + userId);
+  cache.remove('staff_' + userId);
+  cache.remove('staff_record_' + userId);
   cache.remove('staff');
   cache.remove('staff_list');
 }
@@ -650,19 +675,22 @@ function clearStaffCache(userId) {
 function trackUser(userId, displayName) {
   const cache    = CacheService.getScriptCache();
   const cacheKey = 'tracked_' + userId;
-  if (cache.get(cacheKey)) return;
-
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Visitors');
   if (!sheet) return;
   const data  = sheet.getDataRange().getValues();
   const index = data.findIndex(row => row[COL_VISITOR.UID] === userId);
+
   if (index !== -1) {
-    sheet.getRange(index + 1, COL_VISITOR.LAST_SEEN + 1).setValue(new Date());
+    const rowNumber = index + 1;
+    sheet.getRange(rowNumber, COL_VISITOR.LAST_SEEN + 1).setValue(new Date());
+    if (displayName && data[index][COL_VISITOR.DISPLAYNAME] !== displayName) {
+      sheet.getRange(rowNumber, COL_VISITOR.DISPLAYNAME + 1).setValue(displayName);
+    }
   } else {
     sheet.appendRow([userId, displayName, new Date()]);
   }
 
-  cache.put(cacheKey, '1', 3600);
+  cache.put(cacheKey, '1', 300);
 }
 
 function writeLog(uid, sName, lName, q, res) {
@@ -801,6 +829,7 @@ function onEdit(e) {
     const userId = sheet.getRange(row, COL_STAFF.UID + 1).getValue();
     if (userId) {
       cache.remove('staff_' + userId);
+      cache.remove('staff_record_' + userId);
       cache.remove('staff_list');
       cache.remove('staff');
       console.log('Auto-cleared cache for Staff ID: ' + userId);
