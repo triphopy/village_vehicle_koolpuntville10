@@ -120,14 +120,14 @@ function doPost(e) {
         }
 
         // Fuzzy Match กับทะเบียนในระบบ
-        const matchedPlate = fuzzySearchPlate(plateText);
-        const result       = searchByPlate(matchedPlate || plateText);
+        const correctedPlate = resolvePlateFromOcr(plateText);
+        const result         = searchByPlate(correctedPlate || plateText);
 
-        const ocrNote = (matchedPlate && matchedPlate !== plateText)
-          ? '🔍 OCR อ่านได้: "' + plateText + '"\n📝 จับคู่กับ: "' + matchedPlate + '"\n\n'
+        const ocrNote = (correctedPlate && correctedPlate !== plateText)
+          ? '🔍 OCR อ่านได้: "' + plateText + '"\n📝 ปรับเป็น: "' + correctedPlate + '"\n\n'
           : '🔍 OCR อ่านได้: "' + plateText + '"\n\n';
 
-        writeLog(userId, staff.name, lineName, '[OCR] ' + plateText, result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
+        writeLog(userId, staff.name, lineName, '[OCR] ' + (correctedPlate || plateText), result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล');
         return replyToLine(replyToken, ocrNote + result.message);
       }
 
@@ -366,6 +366,113 @@ function fuzzySearchPlate(ocrText) {
     .sort((a, b) => b.score - a.score)[0];
 
   return best ? best.plate : null;
+}
+
+function resolvePlateFromOcr(ocrText) {
+  if (!ocrText) return null;
+
+  const exactMatch = findExactPlateMatch(ocrText);
+  if (exactMatch) return exactMatch;
+
+  const generatedMatch = findPlateByGeneratedCandidates(ocrText);
+  if (generatedMatch) return generatedMatch;
+
+  return fuzzySearchPlate(ocrText);
+}
+
+function findExactPlateMatch(text) {
+  const target = (text || '').replace(/\s/g, '');
+  if (!target) return null;
+
+  const data = getCachedSheetData('Vehicles');
+  const match = data.slice(1).find(row =>
+    row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '') === target
+  );
+
+  return match ? match[COL_VEHICLE.PLATE].toString().replace(/\s/g, '') : null;
+}
+
+function findPlateByGeneratedCandidates(ocrText) {
+  const target = (ocrText || '').replace(/\s/g, '');
+  if (!target) return null;
+
+  const candidateMap = buildPlateCandidateMap();
+  const candidates = generatePlateCandidates(target, 2);
+
+  for (let i = 0; i < candidates.length; i++) {
+    if (candidateMap[candidates[i]]) return candidateMap[candidates[i]];
+  }
+
+  return null;
+}
+
+function buildPlateCandidateMap() {
+  const data = getCachedSheetData('Vehicles');
+  const map = {};
+
+  data.slice(1).forEach(row => {
+    const plate = row[COL_VEHICLE.PLATE].toString().replace(/\s/g, '');
+    if (plate) map[plate] = plate;
+  });
+
+  return map;
+}
+
+function generatePlateCandidates(text, maxChanges) {
+  const confusionMap = getPlateConfusionMap();
+  const results = {};
+  const queue = [{ text, changes: 0, index: 0 }];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    results[current.text] = true;
+
+    if (current.changes >= maxChanges) continue;
+
+    for (let i = current.index; i < current.text.length; i++) {
+      const char = current.text.charAt(i);
+      const replacements = confusionMap[char] || [];
+      for (let j = 0; j < replacements.length; j++) {
+        const replacement = replacements[j];
+        if (replacement === char) continue;
+        const nextText = current.text.substring(0, i) + replacement + current.text.substring(i + 1);
+        if (!results[nextText]) {
+          queue.push({
+            text: nextText,
+            changes: current.changes + 1,
+            index: i + 1
+          });
+        }
+      }
+    }
+  }
+
+  return Object.keys(results);
+}
+
+function getPlateConfusionMap() {
+  return {
+    'ฮ': ['ฮ', 'อ', 'ฬ'],
+    'อ': ['อ', 'ฮ', 'ฬ'],
+    'ฬ': ['ฬ', 'ฮ', 'อ'],
+    'ข': ['ข', 'ช'],
+    'ช': ['ช', 'ข'],
+    'บ': ['บ', '6', '8'],
+    '6': ['6', 'บ', '8'],
+    '8': ['8', 'B', 'บ'],
+    '0': ['0', 'O', 'D', 'Q'],
+    'O': ['O', '0', 'D', 'Q'],
+    'D': ['D', '0', 'O', 'Q'],
+    'Q': ['Q', '0', 'O', 'D'],
+    '1': ['1', 'I', 'l'],
+    'I': ['I', '1', 'l'],
+    'l': ['l', '1', 'I'],
+    '2': ['2', 'Z'],
+    'Z': ['Z', '2'],
+    '5': ['5', 'S'],
+    'S': ['S', '5'],
+    'B': ['B', '8', 'บ']
+  };
 }
 
 function normalizePlateForComparison(text) {
