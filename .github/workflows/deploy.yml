@@ -46,9 +46,16 @@ jobs:
             "rootDir": "./src"
           }' > .clasp.json
 
-          # เก็บ DEPLOYMENT_ID ไว้ใช้ใน step ถัดไป
           echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> $GITHUB_ENV
           echo "ENV_LABEL=$ENV_LABEL" >> $GITHUB_ENV
+
+      - name: Inject version info
+        run: |
+          DEPLOY_TIME=$(TZ='Asia/Bangkok' date '+%Y-%m-%d %H:%M:%S')
+          APP_VERSION="${{ github.ref_name }}-$(echo ${{ github.sha }} | cut -c1-7)"
+
+          printf 'var VERSION_INFO = {\n  version: "%s",\n  env: "%s",\n  deployTime: "%s"\n};\n' \
+            "$APP_VERSION" "$ENV_LABEL" "$DEPLOY_TIME" > ./src/versionInfo.js
 
       - name: Push to Apps Script
         run: clasp push --force
