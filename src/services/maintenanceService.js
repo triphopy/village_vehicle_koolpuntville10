@@ -32,7 +32,19 @@ function dailyBackup() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const folder = getOrCreateBackupFolder();
   const date = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd');
-  DriveApp.getFileById(ss.getId()).makeCopy('Backup_' + date, folder);
+  const backup = SpreadsheetApp.create('Backup_' + date);
+  const backupFile = DriveApp.getFileById(backup.getId());
+
+  ss.getSheets().forEach(function (sheet) {
+    sheet.copyTo(backup).setName(sheet.getName());
+  });
+
+  const defaultSheet = backup.getSheets()[0];
+  if (defaultSheet) {
+    backup.deleteSheet(defaultSheet);
+  }
+
+  backupFile.moveTo(folder);
   console.log('Backup สำเร็จ: ' + date);
 }
 
