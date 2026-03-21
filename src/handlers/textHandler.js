@@ -11,7 +11,16 @@ function handleTextMessage(context) {
   }
 
   const lineName = getLineDisplayName(userId);
-  const staff = getStaff(userId);
+  let staff;
+  try {
+    staff = getStaff(userId);
+  } catch (err) {
+    if (isServiceUnavailableError(err)) {
+      replyToLine(replyToken, buildServiceUnavailableMessage());
+      return;
+    }
+    throw err;
+  }
   const isAdmin = staff && staff.role === 'admin';
 
   if (query === '/myid') {
@@ -73,10 +82,19 @@ function handleTextMessage(context) {
     return;
   }
 
-  const isHouseQuery = query.match(/^\d/) && query.indexOf('/') !== -1;
-  const result = isHouseQuery
-    ? searchByHouseDetailed(query)
-    : searchByPlateDetailed(query);
+  let result;
+  try {
+    const isHouseQuery = query.match(/^\d/) && query.indexOf('/') !== -1;
+    result = isHouseQuery
+      ? searchByHouseDetailed(query)
+      : searchByPlateDetailed(query);
+  } catch (err) {
+    if (isServiceUnavailableError(err)) {
+      replyToLine(replyToken, buildServiceUnavailableMessage());
+      return;
+    }
+    throw err;
+  }
 
   writeLog(userId, staff.name, lineName, query, result.logResult || (result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล'));
   replyToLine(replyToken, result.message);

@@ -4,7 +4,16 @@ function handleImageMessage(context) {
   const replyToken = context.replyToken;
   const groupId = context.groupId;
   const lineName = getLineDisplayName(userId);
-  const staff = getStaff(userId);
+  let staff;
+  try {
+    staff = getStaff(userId);
+  } catch (err) {
+    if (isServiceUnavailableError(err)) {
+      replyToLine(replyToken, buildServiceUnavailableMessage());
+      return;
+    }
+    throw err;
+  }
   const isAdmin = staff && staff.role === 'admin';
 
   if (!isAdmin) {
@@ -37,14 +46,25 @@ function handleImageMessage(context) {
     return;
   }
 
-  const hintedPlate = resolvePlateFromOcr(plateText);
-  const forcedSuggestions = hintedPlate && compactPlateText(hintedPlate) !== compactPlateText(plateText)
-    ? [hintedPlate]
-    : [];
-  const result = searchByPlateDetailed(plateText, {
-    source: 'ocr',
-    forcedSuggestions: forcedSuggestions
-  });
+  let hintedPlate;
+  let forcedSuggestions;
+  let result;
+  try {
+    hintedPlate = resolvePlateFromOcr(plateText);
+    forcedSuggestions = hintedPlate && compactPlateText(hintedPlate) !== compactPlateText(plateText)
+      ? [hintedPlate]
+      : [];
+    result = searchByPlateDetailed(plateText, {
+      source: 'ocr',
+      forcedSuggestions: forcedSuggestions
+    });
+  } catch (err) {
+    if (isServiceUnavailableError(err)) {
+      replyToLine(replyToken, buildServiceUnavailableMessage());
+      return;
+    }
+    throw err;
+  }
   const hasHint = forcedSuggestions.length > 0 && !result.found;
   const hasHighRiskChars = /[อฮฬ]/.test(plateText);
   const warningNote = (hasHint || hasHighRiskChars)
