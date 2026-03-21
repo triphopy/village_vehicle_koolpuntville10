@@ -39,7 +39,53 @@ flowchart TD
     OCR --> GEMINI["Gemini API"]
 ```
 
-## 2. Text Query Flow
+## 2. Component Map
+
+```mermaid
+flowchart LR
+    subgraph CLIENT["Client Layer"]
+        U["LINE User"]
+        LINE["LINE Messaging API"]
+    end
+
+    subgraph GAS["Google Apps Script Application"]
+        WEBHOOK["Webhook Layer<br/>doPost.js / eventRouter.js"]
+        HANDLERS["Handlers<br/>textHandler / imageHandler / followHandler"]
+        COMMANDS["Admin Commands<br/>adminCommandRouter + admin/*.js"]
+        SERVICES["Services<br/>staff / search / ocr / line / visitor / log / maintenance"]
+        CORE["Core Config<br/>appCore.js / versionInfo.js"]
+    end
+
+    subgraph GOOGLE["Google Platform"]
+        SHEETS["Google Sheets<br/>Staff / Vehicles / Visitors / Log"]
+        DRIVE["Google Drive<br/>Backup Folder"]
+        CACHE["GAS CacheService"]
+        PROPS["Script Properties"]
+    end
+
+    subgraph EXTERNAL["External APIs"]
+        LINEAPI["LINE Profile / Reply / Push API"]
+        LINECONTENT["LINE Content API"]
+        GEMINI["Gemini API"]
+    end
+
+    U --> LINE
+    LINE --> WEBHOOK
+    WEBHOOK --> HANDLERS
+    HANDLERS --> COMMANDS
+    HANDLERS --> SERVICES
+    HANDLERS --> CORE
+    COMMANDS --> SERVICES
+    SERVICES --> SHEETS
+    SERVICES --> DRIVE
+    SERVICES --> CACHE
+    CORE --> PROPS
+    SERVICES --> LINEAPI
+    SERVICES --> LINECONTENT
+    SERVICES --> GEMINI
+```
+
+## 3. Text Query Flow
 
 ```mermaid
 flowchart TD
@@ -70,7 +116,7 @@ flowchart TD
     U --> V["Reply to LINE"]
 ```
 
-## 3. OCR Image Flow
+## 4. OCR Image Flow
 
 ```mermaid
 flowchart TD
@@ -102,7 +148,7 @@ flowchart TD
     V --> W["Reply with OCR result and vehicle status"]
 ```
 
-## 4. Backend Degradation Flow
+## 5. Backend Degradation Flow
 
 ```mermaid
 flowchart TD
@@ -119,7 +165,7 @@ flowchart TD
     K --> L["Handler replies with temporary unavailable message"]
 ```
 
-## 5. Deployment Flow
+## 6. Deployment Flow
 
 ```mermaid
 flowchart TD
@@ -137,7 +183,7 @@ flowchart TD
     K -- "no" --> M["GREEN / Staging GAS"]
 ```
 
-## 6. Main Components
+## 7. Main Components
 
 - `src/webhook/doPost.js`: รับ webhook และกัน error ชั้นนอก
 - `src/webhook/eventRouter.js`: แยก follow, text, image
