@@ -13,16 +13,6 @@ function doPost(e) {
 }
 
 function parseWebhookRequest(e) {
-  const token = e && e.parameter ? e.parameter.token : null;
-  if (token !== props.getProperty('WEBHOOK_SECRET')) {
-    return {
-      ok: false,
-      response: ContentService.createTextOutput('Unauthorized')
-    };
-  }
-
-  //debugToLine(JSON.stringify(e, null, 2));
-
   if (!e || !e.postData || !e.postData.contents) {
     return {
       ok: false,

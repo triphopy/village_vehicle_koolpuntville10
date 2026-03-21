@@ -443,28 +443,12 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 
 ## Curl Examples
 
-แทนค่า `<WEB_APP_URL>` และ `<WEBHOOK_SECRET>`
+แทนค่า `<WEB_APP_URL>`
 
-### ไม่มี token
+### ส่ง webhook โดยตรง
 
 ```bash
 curl -X POST "<WEB_APP_URL>" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"events\":[]}"
-```
-
-### token ผิด
-
-```bash
-curl -X POST "<WEB_APP_URL>?token=wrong-token" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"events\":[]}"
-```
-
-### token ถูก
-
-```bash
-curl -X POST "<WEB_APP_URL>?token=<WEBHOOK_SECRET>" ^
   -H "Content-Type: application/json" ^
   -d "{\"events\":[]}"
 ```
