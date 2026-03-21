@@ -1,6 +1,6 @@
 # LINE/GAS Test Cases
 
-เอกสารนี้ใช้สำหรับทดสอบระบบ Vehicle Verification System แบบทีละเคสหลัง deploy หรือหลังแก้โค้ด
+เอกสารนี้ใช้สำหรับทดสอบระบบ Vehicle Verification System หลัง deploy หรือหลังแก้โค้ด โดยเน้นทั้ง flow ปกติ, OCR, admin commands และกรณี backend service มีปัญหา
 
 ## Test Setup
 
@@ -17,11 +17,13 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 กข1234      Toyota  Yaris   ขาว    1/23     A       active
 1กข2345     Honda   City    ดำ     1/24     B       inactive
 80-1234     Isuzu   Dmax    เทา    2/10     C       active
+3ขฮ8777     Mazda   2       แดง    3/12     D       active
 ```
 
 - ใน Script Properties มีค่า `ALLOWED_GROUP_IDS`
 - bot ถูกเชิญเข้า group ทดสอบที่อยู่ใน allowlist แล้ว
 - มี Web App URL สำหรับยิงทดสอบ webhook
+- ถ้าจะทดสอบกรณี service down ให้เตรียมวิธีทำให้ `SPREADSHEET_ID`, สิทธิ์ Spreadsheet หรือสิทธิ์ Drive ใช้งานไม่ได้ชั่วคราว
 
 ## LINE Command Tests
 
@@ -36,7 +38,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 
 - คาดหวัง:
 - เห็น `/myid`, `/help`
-- เห็น admin commands เช่น `/add`, `/remove`, `/setstatus`, `/setrole`, `/list`, `/status`, `/whois`, `/visitors`, `/log`, `/clearcache`
+- เห็น admin commands เช่น `/add`, `/remove`, `/setstatus`, `/setrole`, `/list`, `/status`, `/whois`, `/visitors`, `/log`, `/clearcache`, `/version`
 
 ### TC-02 `/help` สำหรับ staff
 
@@ -88,7 +90,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 ```
 
 - คาดหวัง:
-- ระบบตอบปฏิเสธการใช้งานในกลุ่มที่ไม่ได้กำหนด
+- ระบบตอบปฏิเสธการใช้งานในกลุ่มที่ไม่อนุญาต
 
 ### TC-06 admin ใช้งานนอก group ที่อนุญาต
 
@@ -175,7 +177,107 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - คาดหวัง:
 - ตอบว่าคำสั่งนี้สำหรับ Admin เท่านั้น
 
-### TC-13 `/status` ของ user active
+## Search and OCR Matching Tests
+
+### TC-13 OCR อ่านได้และพบทะเบียนตรงตัว
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งรูปป้าย `กข1234`
+- คาดหวัง:
+- แสดง `อ่านจากรูปได้: กข1234`
+- แสดงข้อมูลรถตามสถานะ
+- ไม่แสดงรายการใกล้เคียง
+
+### TC-14 OCR อ่านได้แต่ไม่พบตรงตัว และมีเลขใกล้เคียง
+
+- ผู้ทดสอบ: `staff_user`
+- ในชีตมี `3ขฮ8777`
+- ส่งรูปที่ OCR อ่านออกเป็น `3ขอ8777`
+- คาดหวัง:
+- แสดง `อ่านจากรูปได้: 3ขอ8777`
+- แสดงว่าไม่พบข้อมูลตรงตัวในระบบ
+- แสดงส่วน `ใกล้เคียงที่อาจเป็น`
+- แสดงผลตรวจให้ตรวจป้ายอีกครั้ง
+
+### TC-15 OCR อ่านได้แต่ไม่พบตรงตัว และไม่มีเลขใกล้เคียง
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งรูปที่ OCR อ่านได้เป็นทะเบียนที่ไม่มีในชีตและไม่ใกล้รายการใด
+- คาดหวัง:
+- แสดงว่าไม่พบข้อมูลตรงตัวในระบบ
+- ไม่แสดงส่วน `ใกล้เคียงที่อาจเป็น`
+- แสดง `ผลตรวจ: ให้แลกบัตร`
+
+### TC-16 OCR รูปไม่ชัด
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งรูปเบลอหรือมืดมาก
+- คาดหวัง:
+- แสดง `📷 อ่านป้ายไม่ชัด`
+- แสดง `ผลตรวจ: กรุณาถ่ายใหม่ หรือพิมพ์เลขทะเบียน`
+- ไม่มี exception หลุดจนระบบเงียบ
+
+### TC-17 OCR จาก user ไม่มีสิทธิ์
+
+- ผู้ทดสอบ: user ที่ไม่อยู่ใน `Staff`
+- ส่งรูปทะเบียน
+- คาดหวัง:
+- bot ตอบว่าไม่มีสิทธิ์เข้าถึงระบบ
+
+### TC-18 OCR จาก staff ใน group ที่ไม่อนุญาต
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งรูปในกลุ่มที่ไม่อยู่ใน allowlist
+- คาดหวัง:
+- bot ปฏิเสธการใช้งาน
+
+### TC-19 พิมพ์ทะเบียนผิด แต่มีเลขใกล้เคียง
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+3ขอ8777
+```
+
+- ในชีตมี `3ขฮ8777`
+- คาดหวัง:
+- แสดง `ใกล้เคียงที่อาจเป็น`
+- แสดง `ผลตรวจ: กรุณาตรวจทะเบียนอีกครั้ง`
+
+### TC-20 พิมพ์ทะเบียนพร้อมช่องว่างหรือขีด
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความหลายแบบ เช่น:
+
+```text
+3 ขฮ 8777
+3ขฮ-8777
+80 1234
+80-1234
+```
+
+- คาดหวัง:
+- ระบบค้นหาเจอข้อมูลเดียวกันได้
+- ไม่ติดจากช่องว่างหรือขีด
+
+### TC-21 ค้นหาบ้านเลขที่ไม่ควรมี `ผลตรวจ:`
+
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+1/23
+```
+
+- คาดหวัง:
+- แสดงรายการรถตามบ้านเลขที่
+- แสดงสถานะ
+- ไม่แสดง `ผลตรวจ:`
+
+## Admin Command Tests
+
+### TC-22 `/status` ของ user active
 
 - ผู้ทดสอบ: `admin_user`
 - ส่งข้อความ:
@@ -189,7 +291,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - แสดง role
 - แสดง `Status: active`
 
-### TC-14 `/status` ของ user inactive
+### TC-23 `/status` ของ user inactive
 
 - ผู้ทดสอบ: `admin_user`
 - ส่งข้อความ:
@@ -203,7 +305,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - แสดง `Status: inactive`
 - ไม่ตอบว่า “ไม่พบ”
 
-### TC-15 `/status` ของ user ที่ไม่มีในระบบ
+### TC-24 `/status` ของ user ที่ไม่มีในระบบ
 
 - ผู้ทดสอบ: `admin_user`
 - ส่งข้อความ:
@@ -215,7 +317,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - คาดหวัง:
 - ตอบว่าไม่พบ User ID นี้ในระบบ
 
-### TC-16 `/log` แบบปกติ
+### TC-25 `/log` แบบปกติ
 
 - ผู้ทดสอบ: `admin_user`
 - ส่งข้อความ:
@@ -228,7 +330,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - แสดง log ล่าสุด 5 รายการหรือน้อยกว่า
 - ไม่เกิด error
 
-### TC-17 `/log` ใส่ค่ามั่ว
+### TC-26 `/log` ใส่ค่ามั่ว
 
 - ผู้ทดสอบ: `admin_user`
 - ส่งข้อความ:
@@ -241,7 +343,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ไม่พัง
 - ใช้ค่า default แทน
 
-### TC-18 `/log` เกิน limit
+### TC-27 `/log` เกิน limit
 
 - ผู้ทดสอบ: `admin_user`
 - ส่งข้อความ:
@@ -254,7 +356,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ไม่พัง
 - จำกัดจำนวนสูงสุดตามที่ระบบกำหนด
 
-### TC-19 `/visitors` แสดงผู้ใช้เคยเข้าระบบ
+### TC-28 `/visitors` แสดงผู้ใช้เคยเข้าระบบ
 
 - ผู้ทดสอบ: `admin_user`
 - ส่งข้อความ:
@@ -267,7 +369,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - เห็น user ที่เคยส่งข้อความเข้า bot
 - มี `last:` ของแต่ละคน
 
-### TC-20 ทดสอบ `last seen` ขยับจริง
+### TC-29 ทดสอบ `last seen` ขยับจริง
 
 - ผู้ทดสอบ: `staff_user`
 - ขั้นตอน:
@@ -282,57 +384,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - คาดหวัง:
 - `last seen` เป็นเวลาล่าสุดจากข้อความรอบสอง ไม่ใช่เวลารอบแรก
 
-## OCR Tests
-
-### TC-21 OCR รูป JPG ชัดเจน
-
-- ผู้ทดสอบ: `staff_user`
-- ส่งรูป JPG ป้าย `กข1234`
-- คาดหวัง:
-- bot ตอบว่า OCR อ่านได้
-- พบข้อมูลรถในระบบ
-
-### TC-22 OCR รูป PNG ชัดเจน
-
-- ผู้ทดสอบ: `staff_user`
-- ส่งรูป PNG ป้าย `กข1234`
-- คาดหวัง:
-- bot ไม่ fail เพราะ mime type
-- พบข้อมูลรถในระบบ
-
-### TC-23 OCR รูปทะเบียน `80-1234`
-
-- ผู้ทดสอบ: `staff_user`
-- ส่งรูปทะเบียน `80-1234`
-- คาดหวัง:
-- OCR อ่านได้
-- ค้นหาเจอรายการรถ
-
-### TC-24 OCR รูปไม่ชัด
-
-- ผู้ทดสอบ: `staff_user`
-- ส่งรูปเบลอหรือมืดมาก
-- คาดหวัง:
-- bot ตอบว่าอ่านทะเบียนไม่ได้
-- ไม่มี exception หลุดจนระบบเงียบ
-
-### TC-25 OCR จาก user ไม่มีสิทธิ์
-
-- ผู้ทดสอบ: user ที่ไม่อยู่ใน `Staff`
-- ส่งรูปทะเบียน
-- คาดหวัง:
-- bot ตอบว่าไม่มีสิทธิ์เข้าถึงระบบ
-
-### TC-26 OCR จาก staff ใน group ที่ไม่อนุญาต
-
-- ผู้ทดสอบ: `staff_user`
-- ส่งรูปในกลุ่มที่ไม่อยู่ใน allowlist
-- คาดหวัง:
-- bot ปฏิเสธการใช้งาน
-
-## Admin Mutation Tests
-
-### TC-27 เพิ่ม staff ใหม่
+### TC-30 เพิ่ม staff ใหม่
 
 - ผู้ทดสอบ: `admin_user`
 - ส่งข้อความ:
@@ -345,7 +397,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ตอบว่าเพิ่มสำเร็จ
 - `/status <new_user_id>` เห็น `active`
 
-### TC-28 เปลี่ยน status เป็น inactive
+### TC-31 เปลี่ยน status เป็น inactive
 
 - ผู้ทดสอบ: `admin_user`
 - ส่งข้อความ:
@@ -359,7 +411,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - `/status <new_user_id>` แสดง `inactive`
 - user นี้ค้นหาทะเบียนต่อไม่ได้
 
-### TC-29 เปลี่ยน role เป็น admin
+### TC-32 เปลี่ยน role เป็น admin
 
 - ผู้ทดสอบ: `admin_user`
 - ส่งข้อความ:
@@ -372,7 +424,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ตอบว่าเปลี่ยนสำเร็จ
 - `/status <new_user_id>` แสดง role เป็น `admin`
 
-### TC-30 ลบ user
+### TC-33 ลบ user
 
 - ผู้ทดสอบ: `admin_user`
 - ส่งข้อความ:
@@ -387,40 +439,17 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 
 ## GAS / Webhook Tests
 
-### TC-31 เรียก webhook โดยไม่มี `token`
+หมายเหตุ: โค้ดปัจจุบันไม่มี query token guard ที่ webhook แล้ว จึงควรทดสอบตามพฤติกรรมจริงของ `doPost(e)`
+
+### TC-34 เรียก webhook โดยไม่มี body
 
 - เครื่องมือ: Postman หรือ `curl`
-- ส่ง `POST` ไป Web App URL โดยไม่มี query `token`
-- body:
-
-```json
-{"events":[]}
-```
-
-- คาดหวัง:
-- response เป็น `Unauthorized`
-
-### TC-32 เรียก webhook ด้วย `token` ผิด
-
-- เครื่องมือ: Postman หรือ `curl`
-- body:
-
-```json
-{"events":[]}
-```
-
-- คาดหวัง:
-- response เป็น `Unauthorized`
-
-### TC-33 เรียก webhook ด้วย `token` ถูก แต่ body ว่าง
-
-- เครื่องมือ: Postman หรือ `curl`
-- ส่ง `POST` ที่ไม่มี JSON body
+- ส่ง `POST` ไป Web App URL โดยไม่มี JSON body
 - คาดหวัง:
 - response เป็น `Bad Request`
-- ไม่มี exception ใน execution log
+- ไม่มี exception หลุดใน execution log
 
-### TC-34 เรียก webhook ด้วย `token` ถูก และ `events` ว่าง
+### TC-35 เรียก webhook ด้วย body ว่าง
 
 - เครื่องมือ: Postman หรือ `curl`
 - body:
@@ -432,7 +461,30 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - คาดหวัง:
 - response เป็น `OK`
 
-### TC-35 เช็ก execution log ตอน OCR ล้มเหลว
+### TC-36 เรียก webhook ด้วย payload ที่ไม่มี `userId`
+
+- เครื่องมือ: Postman หรือ `curl`
+- body:
+
+```json
+{
+  "events": [
+    {
+      "type": "message",
+      "replyToken": "dummy",
+      "message": { "type": "text", "text": "กข1234" },
+      "source": {}
+    }
+  ]
+}
+```
+
+- คาดหวัง:
+- response เป็น `OK`
+- ระบบไม่พัง
+- event ถูก ignore เพราะไม่มี `userId`
+
+### TC-37 ตรวจ execution log ตอน OCR ล้มเหลว
 
 - ตั้ง `GEMINI_API_KEY` ให้ผิดชั่วคราว
 - ส่งรูปเข้า bot
@@ -440,6 +492,97 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - bot ตอบว่าอ่านไม่ได้
 - ไม่มี script crash
 - มี log สำหรับ debug
+
+## Service Outage Tests
+
+### TC-38 Sheets อ่านสดไม่ได้ แต่มี stale cache
+
+- วิธีเตรียม:
+- ให้ `staff_user` ค้นหา `กข1234` อย่างน้อย 1 ครั้ง เพื่อ warm cache
+- จากนั้นทำให้ Spreadsheet อ่านสดไม่ได้ชั่วคราว เช่น เปลี่ยน `SPREADSHEET_ID` หรือปิดสิทธิ์
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+กข1234
+```
+
+- คาดหวัง:
+- ระบบยังตอบได้จาก cache เดิม
+- ไม่มี 500
+- execution log มีข้อความประมาณ `Using stale cache for sheet ...`
+
+### TC-39 Sheets อ่านไม่ได้ และไม่มี stale cache
+
+- วิธีเตรียม:
+- ล้าง cache หรือใช้ environment ใหม่ที่ยังไม่เคย warm cache
+- ทำให้ Spreadsheet อ่านไม่ได้ชั่วคราว
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+กข1234
+```
+
+- คาดหวัง:
+- bot ตอบ `⚠️ ระบบฐานข้อมูลชั่วคราวใช้งานไม่ได้`
+- webhook ไม่ตกเป็น `Internal Server Error`
+
+### TC-40 staff lookup ล้มระหว่างเช็กสิทธิ์
+
+- วิธีเตรียม:
+- ทำให้ชีต `Staff` อ่านไม่ได้ชั่วคราว
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+/myid
+```
+
+- คาดหวัง:
+- bot ตอบ `⚠️ ระบบฐานข้อมูลชั่วคราวใช้งานไม่ได้`
+- ไม่เกิด exception หลุด
+
+### TC-41 admin command ตอน Sheets ใช้งานไม่ได้
+
+- วิธีเตรียม:
+- ทำให้ชีต `Staff` อ่านหรือเขียนไม่ได้ชั่วคราว
+- ผู้ทดสอบ: `admin_user`
+- ส่งข้อความ:
+
+```text
+/list
+```
+
+- คาดหวัง:
+- bot ตอบ `⚠️ ระบบฐานข้อมูลชั่วคราวใช้งานไม่ได้`
+- admin command ไม่พา request ล้มทั้งก้อน
+
+### TC-42 track visitor หรือ write log เขียนชีตไม่ได้
+
+- วิธีเตรียม:
+- ทำให้เขียนชีต `Visitors` หรือ `Log` ไม่ได้ชั่วคราว
+- ผู้ทดสอบ: `staff_user`
+- ส่งข้อความ:
+
+```text
+กข1234
+```
+
+- คาดหวัง:
+- bot ยังตอบผลค้นหาได้
+- execution log มีข้อความ `trackUser skipped:` หรือ `writeLog skipped:`
+- request ไม่พังเพราะงานเขียน log/visitor
+
+### TC-43 Daily maintenance ตอน Drive ใช้งานไม่ได้
+
+- วิธีเตรียม:
+- ทำให้ `DriveApp` ใช้งานไม่ได้ชั่วคราว หรือโฟลเดอร์ backup เข้าถึงไม่ได้
+- เรียก `dailyMaintenance()`
+- คาดหวัง:
+- ฟังก์ชันไม่ crash ทั้งชุด
+- execution log มี `dailyBackup failed:` หรือ `cleanOldBackups failed:`
+- มี log ว่า maintenance จบแบบ `partial failures`
 
 ## Curl Examples
 
@@ -453,77 +596,10 @@ curl -X POST "<WEB_APP_URL>" ^
   -d "{\"events\":[]}"
 ```
 
-## Updated Search/OCR Flow Tests
+### ส่ง webhook แบบ message text จำลอง
 
-### TC-36 OCR อ่านได้ และพบทะเบียนตรงตัว
-
-- ผู้ทดสอบ: `staff_user`
-- ส่งรูปทะเบียนที่มีข้อมูลตรงตัวในชีต เช่น `กข1234`
-- คาดหวัง:
-- แสดง `อ่านจากรูปได้: ...`
-- แสดงข้อมูลรถตามสถานะ
-- ไม่แสดง `ใกล้เคียงที่อาจเป็น`
-- ไม่แสดง `ตรวจในระบบแล้ว: ...`
-
-### TC-37 OCR อ่านได้ แต่ไม่พบข้อมูลตรงตัว และมีเลขใกล้เคียง
-
-- ผู้ทดสอบ: `staff_user`
-- ตั้งข้อมูลใน `Vehicles` ให้มีทะเบียนที่ใกล้เคียง เช่น `3ขฮ8777`
-- ส่งรูปที่ OCR อ่านได้ `3ขอ8777`
-- คาดหวัง:
-- แสดง `อ่านจากรูปได้: 3ขอ8777`
-- แสดง `ไม่พบข้อมูลตรงตัวในระบบ`
-- แสดง `ใกล้เคียงที่อาจเป็น`
-- ไม่แสดง `ตรวจในระบบแล้ว: 3ขฮ8777`
-- แสดง `ผลตรวจ: กรุณาตรวจป้ายอีกครั้ง` หรือ `ผลตรวจ: กรุณาตรวจทะเบียนอีกครั้ง`
-
-### TC-38 OCR อ่านได้ แต่ไม่พบข้อมูลตรงตัว และไม่มีเลขใกล้เคียง
-
-- ผู้ทดสอบ: `staff_user`
-- ส่งรูปที่ OCR อ่านได้เป็นทะเบียนที่ไม่มีในชีต และไม่ใกล้กับรายการใด
-- คาดหวัง:
-- แสดง `ไม่พบข้อมูลตรงตัวในระบบ`
-- ไม่แสดงส่วน `ใกล้เคียงที่อาจเป็น`
-- แสดง `ผลตรวจ: ให้แลกบัตร`
-
-### TC-39 พิมพ์ทะเบียนผิด แต่มีเลขใกล้เคียง
-
-- ผู้ทดสอบ: `staff_user`
-- ส่งข้อความ `3ขอ8777`
-- ในชีตมี `3ขฮ8777`
-- คาดหวัง:
-- แสดง `ใกล้เคียงที่อาจเป็น`
-- แสดง `ผลตรวจ: กรุณาตรวจทะเบียนอีกครั้ง`
-
-### TC-40 พิมพ์ทะเบียนพร้อมช่องว่างหรือขีด
-
-- ผู้ทดสอบ: `staff_user`
-- ส่งข้อความในรูปแบบต่างกัน เช่น:
-
-```text
-3 ขฮ 8777
-3ขฮ-8777
-80 1234
-80-1234
+```bash
+curl -X POST "<WEB_APP_URL>" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"events\":[{\"type\":\"message\",\"replyToken\":\"dummy\",\"message\":{\"type\":\"text\",\"text\":\"กข1234\"},\"source\":{\"userId\":\"U_TEST\",\"groupId\":\"G_TEST\"}}]}"
 ```
-
-- คาดหวัง:
-- ระบบค้นหาเจอข้อมูลเดียวกันได้
-- ไม่ติดจากช่องว่างหรือขีด
-
-### TC-41 ค้นหาบ้านเลขที่ ไม่ควรมี `ผลตรวจ:`
-
-- ผู้ทดสอบ: `staff_user`
-- ส่งข้อความ `171/1`
-- คาดหวัง:
-- แสดงรายการรถตามบ้านเลขที่
-- แสดง `สถานะ`
-- ไม่แสดง `ผลตรวจ:`
-
-### TC-42 OCR อ่านป้ายไม่ชัด
-
-- ผู้ทดสอบ: `staff_user`
-- ส่งรูปเบลอหรือมืดมาก
-- คาดหวัง:
-- แสดง `📷 อ่านป้ายไม่ชัด`
-- แสดง `ผลตรวจ: กรุณาถ่ายใหม่ หรือพิมพ์เลขทะเบียน`
