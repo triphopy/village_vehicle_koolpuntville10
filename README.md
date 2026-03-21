@@ -46,6 +46,51 @@ src/
 4. handler เรียกใช้ service ที่เกี่ยวข้อง เช่น OCR, ค้นหาทะเบียน, สิทธิ์ผู้ใช้, LINE API
 5. คำสั่ง admin จะถูก route ต่อไปยัง command แยกรายคำสั่ง
 
+## System Flow Diagram
+
+ดู diagram แบบเต็มได้ที่ [docs/architecture-flow.md](/C:/Users/jonew/Downloads/P_Kwan/village_vehicle_koolpuntville10/docs/architecture-flow.md)
+
+```mermaid
+flowchart TD
+    A["LINE User"] --> B["LINE Messaging API"]
+    B --> C["GAS Web App doPost(e)"]
+    C --> D["parseWebhookRequest"]
+    D --> E["eventRouter"]
+
+    E --> F["followHandler"]
+    E --> G["textHandler"]
+    E --> H["imageHandler"]
+
+    G --> I["staffService"]
+    G --> J["vehicleSearchService"]
+    G --> K["adminCommandRouter"]
+    G --> L["visitorService / logService"]
+    H --> I
+    H --> M["ocrService"]
+    H --> J
+    H --> L
+    F --> N["lineService"]
+    G --> N
+    H --> N
+
+    I --> O["Google Sheets"]
+    J --> O
+    L --> O
+    M --> P["LINE Content API"]
+    M --> Q["Gemini API"]
+    K --> O
+```
+
+```mermaid
+flowchart LR
+    A["Push to main"] --> B["GitHub Actions deploy.yml"]
+    B --> C["Install clasp"]
+    C --> D["Inject src/versionInfo.js"]
+    D --> E["clasp push --force"]
+    E --> F["clasp deploy"]
+    F --> G["Google Apps Script Production"]
+```
+
 ## หน้าที่ของแต่ละส่วน
 
 ### Core
