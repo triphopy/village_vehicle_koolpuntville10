@@ -23,7 +23,6 @@ function extractPlateFromImage(imageId) {
 
     const imageBlob = fetchLineImageBlob(imageId, steps);
     if (!imageBlob) {
-      cacheOcrResult(imageId, null, LAST_OCR_STATUS, 300);
       flushOcrDebugSummary(steps);
       return null;
     }
@@ -80,7 +79,10 @@ function getCachedOcrResult(imageId) {
   if (!imageId) return null;
 
   const cached = CacheService.getScriptCache().get('ocr_' + imageId);
-  return cached ? JSON.parse(cached) : null;
+  if (!cached) return null;
+
+  const parsed = JSON.parse(cached);
+  return shouldCacheOcrResult(parsed.status) ? parsed : null;
 }
 
 function getCachedOcrResultByImageId(imageId) {
@@ -92,6 +94,8 @@ function getCachedOcrResultByHash(imageHash) {
 }
 
 function cacheOcrResult(imageId, plateText, status, ttlSeconds, imageHash) {
+  if (!shouldCacheOcrResult(status)) return;
+
   const payload = JSON.stringify({
     plateText: plateText || null,
     status: status || 'idle'
@@ -105,6 +109,10 @@ function cacheOcrResult(imageId, plateText, status, ttlSeconds, imageHash) {
   if (imageHash) {
     cache.put('ocr_hash_' + imageHash, payload, ttlSeconds || CACHE_TIME);
   }
+}
+
+function shouldCacheOcrResult(status) {
+  return status === 'success' || status === 'no_text';
 }
 
 function computeImageHash(imageBlob) {
