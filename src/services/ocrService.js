@@ -5,6 +5,13 @@
  */
 function extractPlateFromImage(imageId) {
   const steps = [];
+  const cachedResult = getCachedOcrResultByImageId(imageId);
+  if (cachedResult) {
+    LAST_OCR_STATUS = cachedResult.status || 'success';
+    pushOcrDebugStep(steps, 'cache', 'hit status=' + LAST_OCR_STATUS);
+    flushOcrDebugSummary(steps);
+    return cachedResult.plateText;
+  }
   try {
     LAST_OCR_STATUS = 'idle';
     if (!LINE_ACCESS_TOKEN || !GEMINI_API_KEY) {
@@ -16,8 +23,20 @@ function extractPlateFromImage(imageId) {
 
     const imageBlob = fetchLineImageBlob(imageId, steps);
     if (!imageBlob) {
+      cacheOcrResult(imageId, null, LAST_OCR_STATUS, 300);
       flushOcrDebugSummary(steps);
       return null;
+    }
+
+    const imageHash = computeImageHash(imageBlob);
+    pushOcrDebugStep(steps, 'hash', imageHash);
+    const cachedByHash = getCachedOcrResultByHash(imageHash);
+    if (cachedByHash) {
+      LAST_OCR_STATUS = cachedByHash.status || 'success';
+      cacheOcrResult(imageId, cachedByHash.plateText, LAST_OCR_STATUS, CACHE_TIME, imageHash);
+      pushOcrDebugStep(steps, 'cache', 'hash_hit status=' + LAST_OCR_STATUS);
+      flushOcrDebugSummary(steps);
+      return cachedByHash.plateText;
     }
 
     const firstPass = requestPlateOcr(imageBlob, buildOcrPrompt(), undefined, steps);
@@ -26,6 +45,7 @@ function extractPlateFromImage(imageId) {
         LAST_OCR_STATUS = 'no_text';
       }
       pushOcrDebugStep(steps, 'result', 'ocr returned null');
+      cacheOcrResult(imageId, null, LAST_OCR_STATUS, 600, imageHash);
       flushOcrDebugSummary(steps);
       return null;
     }
@@ -37,12 +57,14 @@ function extractPlateFromImage(imageId) {
         LAST_OCR_STATUS = 'no_text';
       }
       pushOcrDebugStep(steps, 'result', 'cleanPlateText returned null');
+      cacheOcrResult(imageId, null, LAST_OCR_STATUS, 600, imageHash);
       flushOcrDebugSummary(steps);
       return null;
     }
 
     LAST_OCR_STATUS = 'success';
     pushOcrDebugStep(steps, 'result', 'success=' + cleanedFirstPass);
+    cacheOcrResult(imageId, cleanedFirstPass, LAST_OCR_STATUS, CACHE_TIME, imageHash);
     flushOcrDebugSummary(steps);
     return cleanedFirstPass;
   } catch (err) {
@@ -52,6 +74,49 @@ function extractPlateFromImage(imageId) {
     flushOcrDebugSummary(steps);
     return null;
   }
+}
+
+function getCachedOcrResult(imageId) {
+  if (!imageId) return null;
+
+  const cached = CacheService.getScriptCache().get('ocr_' + imageId);
+  return cached ? JSON.parse(cached) : null;
+}
+
+function getCachedOcrResultByImageId(imageId) {
+  return getCachedOcrResult(imageId ? 'image_' + imageId : null);
+}
+
+function getCachedOcrResultByHash(imageHash) {
+  return getCachedOcrResult(imageHash ? 'hash_' + imageHash : null);
+}
+
+function cacheOcrResult(imageId, plateText, status, ttlSeconds, imageHash) {
+  const payload = JSON.stringify({
+    plateText: plateText || null,
+    status: status || 'idle'
+  });
+  const cache = CacheService.getScriptCache();
+
+  if (imageId) {
+    cache.put('ocr_image_' + imageId, payload, ttlSeconds || CACHE_TIME);
+  }
+
+  if (imageHash) {
+    cache.put('ocr_hash_' + imageHash, payload, ttlSeconds || CACHE_TIME);
+  }
+}
+
+function computeImageHash(imageBlob) {
+  const digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    imageBlob.getBytes()
+  );
+
+  return digest.map(function (byte) {
+    const value = byte < 0 ? byte + 256 : byte;
+    return ('0' + value.toString(16)).slice(-2);
+  }).join('');
 }
 
 function fetchLineImageBlob(imageId, steps) {
