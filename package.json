@@ -1,0 +1,7 @@
+{
+  "name": "village-vehicle-koolpuntville10",
+  "private": true,
+  "scripts": {
+    "test": "node tests/pure-logic.test.js"
+  }
+}

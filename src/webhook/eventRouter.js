@@ -1,5 +1,5 @@
-function routeLineEvent(event) {
-  const context = buildEventContext(event);
+function routeLineEvent(event, requestId) {
+  const context = buildEventContext(event, requestId);
   if (!context) return;
 
   if (event.type === 'follow') {
@@ -17,7 +17,7 @@ function routeLineEvent(event) {
   }
 }
 
-function buildEventContext(event) {
+function buildEventContext(event, requestId) {
   const source = event && event.source ? event.source : {};
   const userId = source.userId;
 
@@ -27,6 +27,7 @@ function buildEventContext(event) {
     event: event,
     userId: userId,
     replyToken: event.replyToken,
-    groupId: source.groupId || null
+    groupId: source.groupId || null,
+    requestId: requestId || generateRequestId('event')
   };
 }

@@ -454,13 +454,14 @@ function stringSimilarity(a, b) {
 function editDistance(a, b) {
   const dp = Array.from({ length: b.length + 1 }, function (_, i) { return i; });
   for (let i = 1; i <= a.length; i++) {
-    let prev = i;
+    let prevDiagonal = dp[0];
+    dp[0] = i;
     for (let j = 1; j <= b.length; j++) {
-      const temp = dp[j];
+      const previousRow = dp[j];
       dp[j] = a[i - 1] === b[j - 1]
-        ? dp[j - 1]
-        : 1 + Math.min(dp[j], dp[j - 1], prev);
-      prev = temp;
+        ? prevDiagonal
+        : 1 + Math.min(dp[j], dp[j - 1], prevDiagonal);
+      prevDiagonal = previousRow;
     }
   }
   return dp[b.length];

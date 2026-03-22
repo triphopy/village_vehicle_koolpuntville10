@@ -3,6 +3,7 @@ const HEALTH_SLOW_TOTAL_MS = 3000;
 
 function runHealthCommand(context) {
   getOrCreateSystemLogSheet();
+  const requestId = context.requestId || generateRequestId('health');
   const isFullCheck = context.parts && context.parts[1] && context.parts[1].toLowerCase() === 'full';
   const checks = [
     timedHealthCheck('Config', function () { return checkRequiredProperties(); }),
@@ -47,7 +48,8 @@ function runHealthCommand(context) {
       header + (isFullCheck ? ' (full)' : ''),
       'totalMs=' + totalDurationMs + '; slow=' + slowChecks.map(function (item) { return item.label + ':' + item.durationMs; }).join(', '),
       context.adminId,
-      'mode=' + (isFullCheck ? 'full' : 'default')
+      'mode=' + (isFullCheck ? 'full' : 'default'),
+      requestId
     );
   }
 

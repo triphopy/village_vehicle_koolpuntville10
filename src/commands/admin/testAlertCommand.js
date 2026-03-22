@@ -1,5 +1,5 @@
 function runTestAlertCommand(context) {
-  const requestId = 'testalert_' + new Date().getTime();
+  const requestId = context.requestId || generateRequestId('testalert');
   const message = '[TEST ALERT]\nSystem alert pipeline is working\nrequestId=' + requestId;
 
   writeSystemLog(
