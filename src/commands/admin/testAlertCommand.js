@@ -12,6 +12,7 @@ function runTestAlertCommand(context) {
     'command=/testalert',
     requestId
   );
+  flushBufferedSystemLogs();
 
   const sent = sendAdminAlert(message);
   if (!sent) {
