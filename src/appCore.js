@@ -49,6 +49,18 @@ const COL_LOG = {
   RESULT: 5
 };
 
+const COL_SYSTEM_LOG = {
+  TIMESTAMP: 0,
+  LEVEL: 1,
+  SOURCE: 2,
+  EVENT: 3,
+  MESSAGE: 4,
+  DETAIL: 5,
+  USER_ID: 6,
+  CONTEXT: 7,
+  REQUEST_ID: 8
+};
+
 const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
   .split(',')
   .map(function (id) { return id.trim(); })
@@ -107,21 +119,38 @@ function onEdit(e) {
 
 function debugToLine(msg) {
   if (props.getProperty('DEBUG_MODE') !== 'true') return;
+  sendAdminAlert('[DEBUG]\n' + msg.substring(0, 4900));
+}
 
-  const adminUids = (props.getProperty('ADMIN_UID') || '')
+function sendAdminAlert(msg) {
+  const adminUids = getAdminUids();
+  if (adminUids.length === 0) {
+    console.warn('sendAdminAlert skipped: ADMIN_UID is empty');
+    writeSystemLog('WARN', 'appCore', 'admin_alert_skipped', 'Admin alert skipped', 'ADMIN_UID is empty');
+    return false;
+  }
+
+  let sent = false;
+  adminUids.forEach(function (adminUid) {
+    const ok = pushToLine(adminUid, msg.substring(0, 4900));
+    if (!ok) {
+      console.error('sendAdminAlert push failed for ' + adminUid);
+      writeSystemLog('ERROR', 'appCore', 'admin_alert_failed', 'Admin alert push failed', 'adminUid=' + adminUid, adminUid);
+      return;
+    }
+    sent = true;
+  });
+
+  if (sent) {
+    writeSystemLog('ALERT', 'appCore', 'admin_alert_sent', 'Admin alert delivered', msg.substring(0, 300));
+  }
+
+  return sent;
+}
+
+function getAdminUids() {
+  return (props.getProperty('ADMIN_UID') || '')
     .split(',')
     .map(function (id) { return id.trim(); })
     .filter(function (id) { return id; });
-
-  if (adminUids.length === 0) {
-    console.warn('debugToLine skipped: ADMIN_UID is empty');
-    return;
-  }
-
-  adminUids.forEach(function (adminUid) {
-    const ok = pushToLine(adminUid, '[DEBUG]\n' + msg.substring(0, 4900));
-    if (!ok) {
-      console.error('debugToLine push failed for ' + adminUid);
-    }
-  });
 }

@@ -1,16 +1,23 @@
+const HEALTH_SLOW_CHECK_MS = 1500;
+const HEALTH_SLOW_TOTAL_MS = 3000;
+
 function runHealthCommand(context) {
   const isFullCheck = context.parts && context.parts[1] && context.parts[1].toLowerCase() === 'full';
   const checks = [
-    checkRequiredProperties(),
-    checkSpreadsheetHealth(),
-    checkCacheHealth(),
-    checkDriveHealth(),
-    checkLineHealth(context.adminId, isFullCheck),
-    checkGeminiHealth(isFullCheck)
+    timedHealthCheck('Config', function () { return checkRequiredProperties(); }),
+    timedHealthCheck('Spreadsheet', function () { return checkSpreadsheetHealth(); }),
+    timedHealthCheck('Cache', function () { return checkCacheHealth(); }),
+    timedHealthCheck('Drive', function () { return checkDriveHealth(); }),
+    timedHealthCheck('LINE API', function () { return checkLineHealth(context.adminId, isFullCheck); }),
+    timedHealthCheck('Gemini API', function () { return checkGeminiHealth(isFullCheck); })
   ];
+  const totalDurationMs = checks.reduce(function (sum, item) {
+    return sum + (item.durationMs || 0);
+  }, 0);
 
   const failed = checks.filter(function (item) { return item.status === 'fail'; }).length;
   const warned = checks.filter(function (item) { return item.status === 'warn'; }).length;
+  const slowChecks = checks.filter(function (item) { return item.durationMs >= HEALTH_SLOW_CHECK_MS; });
   const header = failed > 0
     ? '🚨 Health check พบปัญหา ' + failed + ' รายการ'
     : warned > 0
@@ -18,11 +25,44 @@ function runHealthCommand(context) {
       : '✅ Health check ปกติ';
 
   const lines = [header + (isFullCheck ? ' (full)' : ''), ''];
+  lines.push('⏱️ Total: ' + totalDurationMs + ' ms');
+  if (slowChecks.length > 0) {
+    lines.push('🐢 Slow checks: ' + slowChecks.map(function (item) {
+      return item.label + ' ' + item.durationMs + ' ms';
+    }).join(', '));
+  } else if (totalDurationMs >= HEALTH_SLOW_TOTAL_MS) {
+    lines.push('🐢 Response ช้ากว่าปกติ แต่ยังไม่พบ check ที่ช้าเกิน threshold');
+  }
+  lines.push('');
   checks.forEach(function (item) {
-    lines.push(item.icon + ' ' + item.label + ': ' + item.message);
+    lines.push(item.icon + ' ' + item.label + ' (' + item.durationMs + ' ms): ' + item.message);
   });
 
+  if (failed > 0 || warned > 0 || slowChecks.length > 0 || totalDurationMs >= HEALTH_SLOW_TOTAL_MS) {
+    writeSystemLog(
+      failed > 0 ? 'ERROR' : warned > 0 ? 'WARN' : 'INFO',
+      'healthCommand',
+      'health_summary',
+      header + (isFullCheck ? ' (full)' : ''),
+      'totalMs=' + totalDurationMs + '; slow=' + slowChecks.map(function (item) { return item.label + ':' + item.durationMs; }).join(', '),
+      context.adminId,
+      'mode=' + (isFullCheck ? 'full' : 'default')
+    );
+  }
+
   return lines.join('\n');
+}
+
+function timedHealthCheck(label, fn) {
+  const startedAt = new Date().getTime();
+  try {
+    const result = fn();
+    result.label = result.label || label;
+    result.durationMs = new Date().getTime() - startedAt;
+    return result;
+  } catch (err) {
+    return buildHealthResult('fail', label, err.message, new Date().getTime() - startedAt);
+  }
 }
 
 function checkRequiredProperties() {
@@ -190,7 +230,7 @@ function checkGeminiHealth(isFullCheck) {
   }
 }
 
-function buildHealthResult(status, label, message) {
+function buildHealthResult(status, label, message, durationMs) {
   const iconMap = {
     ok: '✅',
     warn: '⚠️',
@@ -201,6 +241,7 @@ function buildHealthResult(status, label, message) {
     status: status,
     label: label,
     message: message,
-    icon: iconMap[status] || 'ℹ️'
+    icon: iconMap[status] || 'ℹ️',
+    durationMs: durationMs || 0
   };
 }
