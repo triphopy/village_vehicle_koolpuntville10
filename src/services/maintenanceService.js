@@ -2,15 +2,67 @@ function keepAlive() {
   Logger.log('keep alive: ' + new Date());
 }
 
+function runMaintenanceStep(name, fn) {
+  const startedAt = new Date().getTime();
+  try {
+    const ok = fn();
+    return {
+      name: name,
+      ok: !!ok,
+      durationMs: new Date().getTime() - startedAt
+    };
+  } catch (err) {
+    console.error(name + ' failed with exception: ' + err.message);
+    return {
+      name: name,
+      ok: false,
+      durationMs: new Date().getTime() - startedAt,
+      error: err.message
+    };
+  }
+}
+
+function sendMaintenanceAlert(results) {
+  const failed = results.filter(function (item) { return !item.ok; });
+  if (failed.length === 0) return false;
+
+  const lines = ['[ALERT] Daily maintenance partial failure', ''];
+  results.forEach(function (item) {
+    const status = item.ok ? 'OK' : 'FAIL';
+    const detail = item.error ? ' - ' + item.error : '';
+    lines.push(status + ' ' + item.name + ' (' + item.durationMs + ' ms)' + detail);
+  });
+
+  writeSystemLog(
+    'ALERT',
+    'maintenanceService',
+    'maintenance_partial_failure',
+    'Daily maintenance completed with partial failures',
+    results.map(function (item) {
+      return (item.ok ? 'OK ' : 'FAIL ') + item.name + ' (' + item.durationMs + ' ms)' + (item.error ? ' - ' + item.error : '');
+    }).join(' | '),
+    '',
+    'trigger=dailyMaintenance'
+  );
+
+  return sendAdminAlert(lines.join('\n'));
+}
+
 function dailyCleanup() {
   try {
     const ss = getSpreadsheetOrThrow();
-    ['Log', 'Visitors'].forEach(function (name) {
-      const sheet = ss.getSheetByName(name);
+    ['Log', 'Visitors', 'SystemLog'].forEach(function (name) {
+      const sheet = name === 'SystemLog'
+        ? getOrCreateSystemLogSheet()
+        : ss.getSheetByName(name);
       if (!sheet) return;
 
       const data = sheet.getDataRange().getValues();
-      const dateIdx = name === 'Log' ? COL_LOG.TIMESTAMP : COL_VISITOR.LAST_SEEN;
+      const dateIdx = name === 'Log'
+        ? COL_LOG.TIMESTAMP
+        : name === 'Visitors'
+          ? COL_VISITOR.LAST_SEEN
+          : COL_SYSTEM_LOG.TIMESTAMP;
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
 
@@ -20,6 +72,7 @@ function dailyCleanup() {
       if (data.length !== toKeep.length) {
         sheet.clearContents();
         sheet.getRange(1, 1, toKeep.length, toKeep[0].length).setValues(toKeep);
+        if (name === 'Visitors') clearVisitorRowMap();
       }
     });
     return true;
@@ -58,7 +111,7 @@ function dailyBackup() {
     }
 
     backupFile.moveTo(folder);
-    console.log('Backup สำเร็จ: ' + date);
+    console.log('Backup completed: ' + date);
     return true;
   } catch (err) {
     console.error('dailyBackup failed: ' + err.message);
@@ -78,7 +131,7 @@ function cleanOldBackups() {
       if (file.getDateCreated() < cutoff) file.setTrashed(true);
     }
 
-    console.log('ลบ Backup เก่าเกิน ' + BACKUPRETENTION_DAYS + ' วันแล้ว');
+    console.log('Deleted backups older than ' + BACKUPRETENTION_DAYS + ' days');
     return true;
   } catch (err) {
     console.error('cleanOldBackups failed: ' + err.message);
@@ -87,12 +140,19 @@ function cleanOldBackups() {
 }
 
 function dailyMaintenance() {
-  const backupOk = dailyBackup();
-  const cleanupBackupOk = cleanOldBackups();
-  const cleanupOk = dailyCleanup();
-  if (backupOk && cleanupBackupOk && cleanupOk) {
+  flushBufferedLogs();
+  flushBufferedSystemLogs();
+  const results = [
+    runMaintenanceStep('dailyBackup', dailyBackup),
+    runMaintenanceStep('cleanOldBackups', cleanOldBackups),
+    runMaintenanceStep('dailyCleanup', dailyCleanup)
+  ];
+  const allOk = results.every(function (item) { return item.ok; });
+
+  if (allOk) {
     console.log('Daily Maintenance completed: ' + new Date());
   } else {
     console.warn('Daily Maintenance completed with partial failures: ' + new Date());
+    sendMaintenanceAlert(results);
   }
 }

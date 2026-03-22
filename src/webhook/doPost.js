@@ -3,11 +3,15 @@ function doPost(e) {
     const request = parseWebhookRequest(e);
     if (!request.ok) return request.response;
 
-    request.events.forEach(routeLineEvent);
+    request.events.forEach(function (event) {
+      routeLineEvent(event, request.requestId);
+    });
     return ContentService.createTextOutput('OK');
   } catch (err) {
     const eventSummary = extractWebhookEventSummary(e);
+    const requestId = generateRequestId('webhook');
     console.error('doPost Error: ' + eventSummary + '\n' + err.stack);
+    writeSystemLog('ERROR', 'doPost', 'webhook_exception', 'Webhook request failed', eventSummary + ' :: ' + err.message, '', '', requestId);
     return ContentService.createTextOutput('Internal Server Error');
   }
 }
@@ -20,12 +24,28 @@ function parseWebhookRequest(e) {
     };
   }
 
-  const data = JSON.parse(e.postData.contents);
+  let data;
+  try {
+    data = JSON.parse(e.postData.contents);
+  } catch (err) {
+    console.error('parseWebhookRequest invalid json: ' + err.message);
+    writeSystemLog('ERROR', 'doPost', 'invalid_webhook_payload', 'Invalid webhook payload', err.message, '', '', generateRequestId('webhook'));
+    return {
+      ok: false,
+      response: ContentService.createTextOutput('Bad Request')
+    };
+  }
 
   return {
     ok: true,
-    events: data.events || []
+    events: data.events || [],
+    requestId: generateRequestId('webhook')
   };
+}
+
+function generateRequestId(prefix) {
+  const base = Utilities.getUuid().replace(/-/g, '').substring(0, 12);
+  return (prefix || 'req') + '_' + base;
 }
 
 function extractWebhookEventSummary(e) {

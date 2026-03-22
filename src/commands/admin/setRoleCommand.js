@@ -1,6 +1,6 @@
 function runSetRoleCommand(context) {
   const parts = context.parts;
-  if (parts.length < 3) return '❌ รูปแบบ:\n/setrole <userId> <admin|staff>';
+  if (parts.length < 3) return '❌ Usage:\n/setrole <userId> <admin|staff>';
 
   const targetId = parts[1].trim();
   const newRole = parts[2].trim().toLowerCase();

@@ -4,11 +4,13 @@ function handleImageMessage(context) {
   const replyToken = context.replyToken;
   const groupId = context.groupId;
   const lineName = getLineDisplayName(userId);
+  const requestId = context.requestId;
   let staff;
   try {
     staff = getStaff(userId);
   } catch (err) {
     if (isServiceUnavailableError(err)) {
+      writeSystemLog('ERROR', 'imageHandler', 'ocr_search_service_unavailable', 'OCR search failed due to service unavailable', err.message, userId, 'groupId=' + (groupId || ''), requestId);
       replyToLine(replyToken, buildServiceUnavailableMessage());
       return;
     }
@@ -36,6 +38,9 @@ function handleImageMessage(context) {
 
   if (!plateText) {
     const isRateLimit = LAST_OCR_STATUS === 'gemini_rate_limit';
+    if (isRateLimit) {
+      writeSystemLog('WARN', 'imageHandler', 'ocr_rate_limit', 'OCR is temporarily rate limited', 'LAST_OCR_STATUS=' + LAST_OCR_STATUS, userId, 'groupId=' + (groupId || ''), requestId);
+    }
     writeLog(userId, staff.name, lineName, '[OCR] ส่งรูป', isRateLimit ? 'OCR ระบบหนาแน่น' : 'อ่านไม่ได้');
     replyToLine(
       replyToken,

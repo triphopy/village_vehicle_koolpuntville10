@@ -2,7 +2,8 @@ function runLogCommand(context) {
   const parts = context.parts;
   const parsedLimit = parts[1] ? parseInt(parts[1], 10) : 5;
   const limit = Math.max(1, Math.min(isNaN(parsedLimit) ? 5 : parsedLimit, 20));
-  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Log');
+  flushBufferedLogs();
+  const sheet = getSheetOrThrow('Log');
   const values = sheet.getDataRange().getValues();
   const dataRows = values.slice(1);
   if (dataRows.length === 0) return '📋 ยังไม่มี Log ในระบบ';

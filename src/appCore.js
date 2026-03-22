@@ -1,6 +1,6 @@
 /**
  * Vehicle Verification System (Group Event + UID Tracking + OCR)
- * เพิ่ม: OCR ด้วย Gemini 2.5 Flash-Lite + Fuzzy Match
+ * Added OCR with Gemini 2.5 Flash-Lite and fuzzy matching
  */
 
 // ============================
@@ -47,6 +47,18 @@ const COL_LOG = {
   LINE_NAME: 3,
   QUERY: 4,
   RESULT: 5
+};
+
+const COL_SYSTEM_LOG = {
+  TIMESTAMP: 0,
+  LEVEL: 1,
+  SOURCE: 2,
+  EVENT: 3,
+  MESSAGE: 4,
+  DETAIL: 5,
+  USER_ID: 6,
+  CONTEXT: 7,
+  REQUEST_ID: 8
 };
 
 const ALLOWED_GROUP_IDS = (props.getProperty('ALLOWED_GROUP_IDS') || '')
@@ -98,37 +110,47 @@ function onEdit(e) {
     cache.remove('vehicles');
     console.log('Auto-cleared vehicle cache due to manual edit');
   }
+
+  if (sheetName === 'Visitors') {
+    clearVisitorRowMap();
+    console.log('Auto-cleared visitor row cache due to manual edit');
+  }
 }
 
 function debugToLine(msg) {
   if (props.getProperty('DEBUG_MODE') !== 'true') return;
+  sendAdminAlert('[DEBUG]\n' + msg.substring(0, 4900));
+}
 
-  const adminUids = (props.getProperty('ADMIN_UID') || '')
+function sendAdminAlert(msg) {
+  const adminUids = getAdminUids();
+  if (adminUids.length === 0) {
+    console.warn('sendAdminAlert skipped: ADMIN_UID is empty');
+    writeSystemLog('WARN', 'appCore', 'admin_alert_skipped', 'Admin alert skipped', 'ADMIN_UID is empty');
+    return false;
+  }
+
+  let sent = false;
+  adminUids.forEach(function (adminUid) {
+    const ok = pushToLine(adminUid, msg.substring(0, 4900));
+    if (!ok) {
+      console.error('sendAdminAlert push failed for ' + adminUid);
+      writeSystemLog('ERROR', 'appCore', 'admin_alert_failed', 'Admin alert push failed', 'adminUid=' + adminUid, adminUid);
+      return;
+    }
+    sent = true;
+  });
+
+  if (sent) {
+    writeSystemLog('ALERT', 'appCore', 'admin_alert_sent', 'Admin alert delivered', msg.substring(0, 300));
+  }
+
+  return sent;
+}
+
+function getAdminUids() {
+  return (props.getProperty('ADMIN_UID') || '')
     .split(',')
     .map(function (id) { return id.trim(); })
     .filter(function (id) { return id; });
-
-  if (adminUids.length === 0) {
-    console.warn('debugToLine skipped: ADMIN_UID is empty');
-    return;
-  }
-
-  adminUids.forEach(function (adminUid) {
-    const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'post',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN
-      },
-      payload: JSON.stringify({
-        to: adminUid,
-        messages: [{ type: 'text', text: '[DEBUG]\n' + msg.substring(0, 4900) }]
-      }),
-      muteHttpExceptions: true
-    });
-
-    if (response.getResponseCode() >= 300) {
-      console.error('debugToLine push failed for ' + adminUid + ': ' + response.getContentText());
-    }
-  });
 }

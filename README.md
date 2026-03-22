@@ -1,13 +1,24 @@
-ระบบตรวจสอบทะเบียนรถลูกบ้าน (Vehicle Verification System) คือระบบแชทบอทบน LINE ที่มีวัตถุประสงค์เพื่อจัดเก็บและตรวจสอบข้อมูลทะเบียนรถของผู้อยู่อาศัยภายในโครงการ รองรับการใช้งานโดยลูกบ้านและเจ้าหน้าที่ที่เกี่ยวข้อง ผ่านแอปพลิเคชัน LINE ที่คุ้นเคย เพื่อเสริมสร้างความปลอดภัยและความเป็นระเบียบในการบริหารจัดการยานพาหนะภายในพื้นที่โครงการ
+# Vehicle Verification System
+
+ระบบตรวจสอบทะเบียนรถลูกบ้านบน LINE Bot สำหรับโครงการหมู่บ้าน พัฒนาด้วย Google Apps Script และใช้งาน Google Sheets เป็นฐานข้อมูลหลัก รองรับการค้นหาทะเบียนด้วยข้อความ, OCR จากรูปภาพ, คำสั่งแอดมิน, system health check, system alerts และ logging สำหรับงานปฏิบัติการ
+
+## ภาพรวม
+
+- รับ webhook จาก LINE Messaging API ผ่าน `doPost(e)`
+- รองรับการค้นหาด้วยทะเบียนรถและบ้านเลขที่
+- รองรับ OCR จากรูปภาพผ่าน LINE Content API + Gemini API
+- แยก admin commands เป็นไฟล์ย่อยเพื่อลด conflict และรีวิวได้ง่าย
+- มี `SystemLog`, `/health`, `/health full`, `/syslog`, `/testalert`
+- มี maintenance jobs สำหรับ backup, cleanup และแจ้งเตือน partial failures
+- มี local automated tests สำหรับ pure logic ที่รันได้เร็ว
 
 ## โครงสร้างโปรเจกต์
-
-โปรเจกต์นี้พัฒนาบน Google Apps Script และ deploy ด้วย `clasp` โดยใช้ `src/` เป็น `rootDir`
 
 ```text
 src/
   appCore.js
   appsscript.json
+  versionInfo.js
   webhook/
     doPost.js
     eventRouter.js
@@ -16,6 +27,7 @@ src/
     imageHandler.js
     textHandler.js
   services/
+    httpService.js
     lineService.js
     logService.js
     maintenanceService.js
@@ -28,135 +40,215 @@ src/
     admin/
       addUserCommand.js
       clearCacheCommand.js
+      healthCommand.js
       listUsersCommand.js
       logCommand.js
       removeUserCommand.js
       setRoleCommand.js
       setStatusCommand.js
       statusCommand.js
+      syslogCommand.js
+      testAlertCommand.js
+      versionCommand.js
       visitorsCommand.js
       whoisCommand.js
+tests/
+  helpers/
+    load-gas-file.js
+  pure-logic.test.js
+docs/
+  architecture-flow.md
 ```
 
 ## การทำงานโดยสรุป
 
-1. LINE webhook เรียก `doPost(e)` ใน `src/webhook/doPost.js`
-2. `eventRouter.js` แยกประเภท event
-3. event จะถูกส่งต่อไปยัง handler ตามชนิดของข้อความ
-4. handler เรียกใช้ service ที่เกี่ยวข้อง เช่น OCR, ค้นหาทะเบียน, สิทธิ์ผู้ใช้, LINE API
-5. คำสั่ง admin จะถูก route ต่อไปยัง command แยกรายคำสั่ง
+1. LINE ส่ง event มาที่ `src/webhook/doPost.js`
+2. `src/webhook/eventRouter.js` route event ไปยัง handler ที่เหมาะสม
+3. `textHandler` รับผิดชอบข้อความทั่วไป, help, search, และ admin command entry
+4. `imageHandler` รับผิดชอบ OCR flow และค้นหาทะเบียนจากภาพ
+5. services จะเชื่อมกับ Google Sheets, CacheService, Google Drive, LINE API และ Gemini API
+6. admin commands จะถูก dispatch ต่อใน `src/commands/adminCommandRouter.js`
 
-## System Flow Diagram
+รายละเอียด flow แบบเต็มดูได้ที่ [docs/architecture-flow.md](./docs/architecture-flow.md)
 
-ดู diagram แบบเต็มได้ที่ [docs/architecture-flow.md](/C:/Users/jonew/Downloads/P_Kwan/village_vehicle_koolpuntville10/docs/architecture-flow.md)
+หน้าเอกสารหลัก:
 
-```mermaid
-flowchart TD
-    A["LINE User"] --> B["LINE Messaging API"]
-    B --> C["GAS Web App doPost(e)"]
-    C --> D["parseWebhookRequest"]
-    D --> E["eventRouter"]
+- [docs/index.html](./docs/index.html)
 
-    E --> F["followHandler"]
-    E --> G["textHandler"]
-    E --> H["imageHandler"]
+คู่มือที่อัปเดตตาม codebase ปัจจุบัน:
 
-    G --> I["staffService"]
-    G --> J["vehicleSearchService"]
-    G --> K["adminCommandRouter"]
-    G --> L["visitorService / logService"]
-    H --> I
-    H --> M["ocrService"]
-    H --> J
-    H --> L
-    F --> N["lineService"]
-    G --> N
-    H --> N
+- [docs/user-manual.html](./docs/user-manual.html)
+- [docs/technical-guide.html](./docs/technical-guide.html)
+- [docs/architecture-flow.html](./docs/architecture-flow.html)
 
-    I --> O["Google Sheets"]
-    J --> O
-    L --> O
-    M --> P["LINE Content API"]
-    M --> Q["Gemini API"]
-    K --> O
+GitHub Pages support:
+
+- entry page: [docs/index.html](./docs/index.html)
+- workflow: [.github/workflows/docs-pages.yml](./.github/workflows/docs-pages.yml)
+
+## Google Sheets ที่ระบบใช้
+
+- `Staff`
+  ใช้เก็บชื่อ, LINE UID, status, role
+- `Vehicles`
+  ใช้เก็บทะเบียนรถ, บ้านเลขที่, เจ้าของ และสถานะรถ
+- `Visitors`
+  ใช้เก็บผู้ใช้ที่เคยใช้งานบอท และเวลาใช้งานล่าสุด
+- `Log`
+  ใช้เก็บ search logs ของผู้ใช้
+- `SystemLog`
+  ใช้เก็บ system events เช่น alert, health summary, maintenance failure, admin command failures
+
+`SystemLog` สามารถถูกสร้างอัตโนมัติพร้อม header ได้เมื่อระบบเริ่มใช้งานคำสั่งที่เกี่ยวข้อง เช่น `/health`
+
+## Script Properties หลัก
+
+- `LINE_ACCESS_TOKEN`
+- `LINE_CHANNEL_SECRET`
+- `GEMINI_API_KEY`
+- `SPREADSHEET_ID`
+- `ALLOWED_GROUP_IDS`
+- `ADMIN_UID`
+- `LOG_RETENTION_DAYS`
+- `BACKUP_RETENTION_DAYS`
+- `BACKUP_FOLDER_NAME`
+- `DEBUG_MODE`
+- `GITHUB_REPO`
+
+## คำสั่งที่รองรับ
+
+### ทุกคน
+
+- `/myid`
+- `/help`
+
+### Admin เท่านั้น
+
+- `/add <userId> <name> <role>`
+- `/remove <userId>`
+- `/setstatus <userId> <active|inactive>`
+- `/setrole <userId> <admin|staff>`
+- `/list`
+- `/status <userId>`
+- `/whois`
+- `/visitors`
+- `/log <count>`
+- `/syslog <count>`
+- `/health`
+- `/health full`
+- `/testalert`
+- `/clearcache`
+- `/version`
+
+## Ops และ Monitoring
+
+### `/health`
+
+- เช็ก `Config`, `Spreadsheet`, `Cache`, `Drive`
+- ตรวจว่า `SystemLog` มีอยู่และพร้อมใช้งาน
+- แสดงเวลารวมและเวลาของแต่ละ check
+- โหมดปกติจะไม่ยิง LINE live check และไม่ยิง Gemini live check
+
+### `/health full`
+
+- ทำทุกอย่างเหมือน `/health`
+- เพิ่ม live check ของ LINE Profile API
+- เพิ่ม live check ของ Gemini API
+- เหมาะกับการ debug มากกว่าการใช้เป็น routine check
+
+### `/syslog <count>`
+
+- อ่าน `SystemLog` ล่าสุด
+- flush buffered system logs ก่อนอ่าน
+- จำกัดจำนวนที่อ่านต่อครั้งไม่เกิน 20 รายการ
+
+### `/testalert`
+
+- สร้าง `SystemLog` ระดับ `ALERT`
+- flush ลงชีตทันที
+- push admin alert ไปยัง LINE
+- ใช้ทดสอบ alert pipeline โดยไม่ต้องทำให้ระบบจริงพัง
+
+## Logging และ Alerting
+
+### Search log
+
+- `writeLog()` จะ buffer logs ไว้ก่อน
+- flush ลงชีต `Log` เมื่อครบ 10 รายการ หรือเมื่อ maintenance เรียก flush
+
+### System log
+
+- `writeSystemLog()` เขียนลง `SystemLog`
+- `ALERT` และ `ERROR` จะ flush ลงชีตทันที
+- `WARN` และ `INFO` จะ buffer และ flush เมื่อครบ 5 รายการ หรือเมื่อมี explicit flush
+- มี `requestId` สำหรับ trace event สำคัญ
+
+### Maintenance alerts
+
+- `dailyMaintenance()` รัน `dailyBackup`, `cleanOldBackups`, `dailyCleanup`
+- ถ้ามี step ใด fail จะส่ง admin alert และเขียน `SystemLog`
+
+## การจัดการ cache และ performance
+
+- `visitorService` มี row map cache สำหรับ `Visitors`
+- `logService` ใช้ buffering เพื่อลดการเขียนชีตถี่เกินไป
+- `httpService` รวม retry/error handling ของ LINE, Gemini และ GitHub checks
+- `onEdit(e)` จะล้าง cache อัตโนมัติเมื่อแก้ `Staff`, `Vehicles`, `Visitors`
+
+## Automated Tests
+
+ชุด test ปัจจุบันเป็น local tests สำหรับ pure logic ที่ไม่ต้องแตะ GAS runtime จริง
+
+รันด้วย:
+
+```bash
+node tests/pure-logic.test.js
 ```
 
-```mermaid
-flowchart LR
-    A["Push to main"] --> B["GitHub Actions deploy.yml"]
-    B --> C["Install clasp"]
-    C --> D["Inject src/versionInfo.js"]
-    D --> E["clasp push --force"]
-    E --> F["clasp deploy"]
-    F --> G["Google Apps Script Production"]
+หรือ:
+
+```bash
+npm test
 ```
 
-## หน้าที่ของแต่ละส่วน
+สิ่งที่เทสอยู่ตอนนี้:
 
-### Core
+- plate normalization
+- OCR cleanup
+- OCR candidate generation
+- OCR resolution
+- fuzzy matching
+- similarity/edit distance logic
 
-- `src/appCore.js`
-- เก็บ shared configuration, column mapping, `onEdit(e)`, และ `debugToLine()`
+## Deployment
 
-### Webhook
+โปรเจกต์นี้ deploy ด้วย `clasp` โดยใช้ `src/` เป็น `rootDir`
 
-- `src/webhook/doPost.js`
-- จุดเข้า Web App และ parse request
+- push ไป `main`
+  deploy ไป BLUE / production
+- push ไป `feature/**`
+  deploy ไป GREEN / staging
 
-- `src/webhook/eventRouter.js`
-- แยก event ไปยัง handler ที่เหมาะสม
+workflow อยู่ที่ [.github/workflows/deploy.yml](./.github/workflows/deploy.yml)
 
-### Handlers
+ระหว่าง CI จะมีการ:
 
-- `src/handlers/followHandler.js`
-- ตอบกลับเมื่อ user เพิ่ม bot
+1. ติดตั้ง `@google/clasp`
+2. เขียน `.clasprc.json` จาก `CLASP_TOKEN`
+3. เขียน `.clasp.json` ให้ตรงกับ branch
+4. inject `src/versionInfo.js`
+5. รัน `clasp push --force`
+6. รัน `clasp deploy`
 
-- `src/handlers/imageHandler.js`
-- จัดการรูปภาพและ flow OCR
+## Runtime entrypoints
 
-- `src/handlers/textHandler.js`
-- จัดการข้อความทั่วไป, search, help, และ admin command entry
+- Web App webhook entrypoint: `doPost(e)` ใน `src/webhook/doPost.js`
+- Spreadsheet trigger: `onEdit(e)` ใน `src/appCore.js`
+- time-driven trigger candidates:
+  - `keepAlive()`
+  - `dailyMaintenance()`
 
-### Services
+## หมายเหตุ
 
-- `src/services/ocrService.js`
-- OCR, fuzzy match, correction logic
-
-- `src/services/staffService.js`
-- staff lookup, cache, และสิทธิ์การใช้งาน
-
-- `src/services/lineService.js`
-- LINE profile lookup, reply, push message
-
-- `src/services/vehicleSearchService.js`
-- ค้นหาทะเบียนและบ้านเลขที่
-
-- `src/services/visitorService.js`
-- ติดตามผู้ใช้ที่เคยใช้งานระบบ
-
-- `src/services/logService.js`
-- เขียน log ลงชีต
-
-- `src/services/maintenanceService.js`
-- backup, cleanup, และ maintenance jobs
-
-### Commands
-
-- `src/commands/adminCommandRouter.js`
-- แยก admin command ไปยังคำสั่งย่อย
-
-- `src/commands/admin/*.js`
-- แยก logic ของแต่ละคำสั่ง admin ออกจากกันเพื่อลด conflict และ review ง่ายขึ้น
-
-## จุดที่ GAS เรียกโดยตรง
-
-- `doPost(e)` สำหรับ Web App webhook
-- `onEdit(e)` สำหรับ clear cache หลังแก้ข้อมูลในชีต
-- ฟังก์ชัน maintenance เช่น `keepAlive()` หรือ `dailyMaintenance()` สามารถนำไปตั้ง time-driven trigger ได้
-
-## ประโยชน์ของโครงสร้างใหม่
-
-- ลด conflict จากไฟล์ monolithic เดิม
-- แยกความรับผิดชอบของแต่ละส่วนชัดเจนขึ้น
-- เพิ่ม feature และรีวิวโค้ดได้ง่ายขึ้น
-- รองรับการทำงานพร้อมกันหลายคนได้ดีกว่าเดิม
+- ข้อความตอบผู้ใช้ใน LINE ตั้งใจคงภาษาไทยไว้
+- developer-facing text, usage placeholders และ internal docs ค่อย ๆ ปรับเป็นอังกฤษเพื่อลดปัญหา encoding ระหว่างแก้ไขไฟล์

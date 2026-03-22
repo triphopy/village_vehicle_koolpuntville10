@@ -1,7 +1,7 @@
 function runAddUserCommand(context) {
   const parts = context.parts;
   if (parts.length < 4) {
-    return '❌ รูปแบบ:\n/add <userId> <ชื่อ> <role>\nเช่น: /add U578... สมชาย staff';
+    return '❌ Usage:\n/add <userId> <name> <role>\nExample: /add U578... Somchai staff';
   }
 
   const newId = parts[1].trim();

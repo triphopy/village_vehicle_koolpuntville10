@@ -3,6 +3,7 @@ function handleTextMessage(context) {
   const userId = context.userId;
   const replyToken = context.replyToken;
   const groupId = context.groupId;
+  const requestId = context.requestId;
   const query = event.message.text.trim();
 
   if (query.length > 50) {
@@ -42,7 +43,7 @@ function handleTextMessage(context) {
     let msg = '📋 คำสั่งที่ใช้ได้\n\n👤 ทุกคน\n/myid\n/help';
     if (isAdmin) {
       msg += '\n\n🧑 Admin เท่านั้น\n' +
-             '/add <userId> <ชื่อ> <role>\n' +
+             '/add <userId> <name> <role>\n' +
              '/remove <userId>\n' +
              '/setstatus <userId> <active|inactive>\n' +
              '/setrole <userId> <admin|staff>\n' +
@@ -50,7 +51,11 @@ function handleTextMessage(context) {
              '/status <userId>\n' +
              '/whois\n' +
              '/visitors\n' +
-             '/log <จำนวน>\n' +
+             '/log <count>\n' +
+             '/syslog <count>\n' +
+             '/health\n' +
+             '/health full\n' +
+             '/testalert\n' +
              '/clearcache\n' +
              '/version';
     }
@@ -75,6 +80,7 @@ function handleTextMessage(context) {
 
   if (query.startsWith('/')) {
     if (isAdmin) {
+      event.__requestId = requestId;
       replyToLine(replyToken, handleAdminCommand(query, userId, event));
     } else {
       replyToLine(replyToken, '🚫 คำสั่งนี้สำหรับ Admin เท่านั้น');

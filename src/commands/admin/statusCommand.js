@@ -1,6 +1,6 @@
 function runStatusCommand(context) {
   const parts = context.parts;
-  if (parts.length < 2) return '❌ รูปแบบ:\n/status <userId>';
+  if (parts.length < 2) return '❌ Usage:\n/status <userId>';
 
   const checkId = parts[1].trim();
   const targetStaff = getStaffRecord(checkId);

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Docs — Vehicle Verification System</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --panel: #ffffff;
+    --panel-2: #eef4fb;
+    --border: #d7e1ef;
+    --text: #142338;
+    --muted: #607289;
+    --blue: #1e5fd6;
+    --blue-soft: #e9f1ff;
+    --green: #16794a;
+    --green-soft: #e9f8f0;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans Thai', sans-serif;
+    --shadow: 0 18px 48px rgba(20,35,56,0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background:
+      radial-gradient(circle at top right, rgba(30,95,214,0.10), transparent 24%),
+      linear-gradient(180deg, #eef4fb 0%, #f9fbfd 220px, #f4f7fb 100%);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .hero {
+    padding: 60px 24px 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-inner, .wrap {
+    max-width: 1040px;
+    margin: 0 auto;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--blue-soft);
+    color: var(--blue);
+    border: 1px solid #cfe0ff;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  h1 {
+    margin: 18px 0 12px;
+    font-size: 40px;
+    line-height: 1.14;
+  }
+  .subtitle {
+    max-width: 760px;
+    font-size: 16px;
+    color: var(--muted);
+  }
+  .hero-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
+    margin: 28px auto 24px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 22px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    margin: 0 0 8px;
+    font-size: 22px;
+  }
+  .card p {
+    margin: 0 0 18px;
+    color: var(--muted);
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .meta span {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--muted);
+    font-size: 12px;
+    border: 1px solid var(--border);
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 11px 14px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    border: 1px solid transparent;
+  }
+  .btn-primary {
+    background: var(--blue);
+    color: #fff;
+  }
+  .btn-secondary {
+    background: var(--green-soft);
+    color: var(--green);
+    border-color: #cdebd9;
+  }
+  .section {
+    margin: 0 auto 28px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+  .section h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 20px;
+  }
+  .section p, .section li {
+    color: var(--muted);
+  }
+  .section a {
+    color: var(--blue);
+  }
+  code {
+    font-family: var(--mono);
+    background: var(--panel-2);
+    color: var(--blue);
+    padding: 2px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .footer {
+    max-width: 1040px;
+    margin: 0 auto 36px;
+    padding: 0 8px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  @media (max-width: 760px) {
+    h1 { font-size: 32px; }
+    .card, .section { border-radius: 18px; }
+  }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="eyebrow">DOCS INDEX <span>Vehicle Verification System</span></div>
+      <h1>หน้าเอกสารหลักของโปรเจกต์</h1>
+      <p class="subtitle">รวมคู่มือผู้ใช้งาน, คู่มือเชิงเทคนิค และเอกสาร architecture ไว้ในจุดเดียว เพื่อให้เปิดจาก GitHub หรือ GitHub Pages ได้สะดวกขึ้น และให้เอกสารถูก version ไปพร้อมกับ code</p>
+      <div class="hero-pills">
+        <span class="pill">Google Apps Script</span>
+        <span class="pill">LINE Bot</span>
+        <span class="pill">Gemini OCR</span>
+        <span class="pill">SystemLog</span>
+        <span class="pill">Health Checks</span>
+      </div>
+      <div class="hero-meta">
+        <span class="pill">Last updated: 2026-03-22</span>
+        <span class="pill">Branch-ready for GitHub Pages</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="grid">
+      <section class="card">
+        <h2>คู่มือผู้ใช้งาน</h2>
+        <p>เหมาะสำหรับ admin, staff และผู้ดูแลหน้างานที่ต้องการดูคำสั่ง, สิทธิ์การใช้งาน, วิธีค้นหา และการตรวจสุขภาพระบบจาก LINE</p>
+        <div class="meta">
+          <span>User-facing</span>
+          <span>Thai</span>
+          <span>Admin Commands</span>
+        </div>
+        <div class="actions">
+          <a class="btn btn-primary" href="./user-manual.html">เปิดคู่มือผู้ใช้งาน</a>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>คู่มือเชิงเทคนิค</h2>
+        <p>สรุป architecture, runtime sheets, script properties, deploy flow, maintenance, logging และ local tests สำหรับทีมที่ดูแลระบบ</p>
+        <div class="meta">
+          <span>Technical</span>
+          <span>Deployment</span>
+          <span>Operations</span>
+        </div>
+        <div class="actions">
+          <a class="btn btn-primary" href="./technical-guide.html">เปิดคู่มือเชิงเทคนิค</a>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Architecture Flow</h2>
+        <p>ดูภาพรวม flow ของ webhook, text/image handlers, admin ops, logging, maintenance และ deployment ในรูปแบบ HTML สำหรับเปิดบน GitHub Pages ได้สะดวกขึ้น</p>
+        <div class="meta">
+          <span>Architecture</span>
+          <span>Mermaid</span>
+          <span>HTML</span>
+        </div>
+        <div class="actions">
+          <a class="btn btn-primary" href="./architecture-flow.html">เปิดเอกสาร architecture</a>
+          <a class="btn btn-secondary" href="./architecture-flow.md">ดู markdown source</a>
+        </div>
+      </section>
+    </div>
+
+    <section class="section">
+      <h3>แนะนำการใช้งาน</h3>
+      <ul>
+        <li>เริ่มจากคู่มือผู้ใช้งาน ถ้าต้องการดูคำสั่งหรือ flow ที่คนหน้างานใช้จริง</li>
+        <li>เปิดคู่มือเชิงเทคนิค เมื่อต้องตั้งค่า Script Properties, ตรวจ logging หรือดู maintenance behavior</li>
+        <li>ใช้งานร่วมกับ <a href="../README.md">README.md</a> เพื่อดูภาพรวม repo และคำสั่งทดสอบ</li>
+      </ul>
+      <p>ถ้าเปิดผ่าน GitHub Pages ไฟล์นี้สามารถใช้เป็น landing page หลักของเอกสารได้ทันที</p>
+    </section>
+  </main>
+
+  <div class="footer">
+    เอกสารชุดนี้ถูกเก็บใน repo เพื่อให้เปลี่ยนแปลงไปพร้อมกับ code และลดความเสี่ยงที่คู่มือจะตกยุคจาก implementation จริง
+  </div>
+</body>
+</html>

@@ -1,5 +1,5 @@
 function runVisitorsCommand() {
-  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Visitors');
+  const sheet = getSheetOrThrow('Visitors');
   if (!sheet) return '❌ ไม่พบ Sheet Visitors';
 
   const values = sheet.getDataRange().getValues();

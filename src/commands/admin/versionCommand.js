@@ -5,9 +5,9 @@ function runVersionCommand() {
   const repo       = PropertiesService.getScriptProperties()
                        .getProperty('GITHUB_REPO') || '';
 
-  // แยก branch และ SHA จาก version string
-  // เช่น "feature/debugToLine-a1b2c3d" → branch="feature/debugToLine", sha="a1b2c3d"
-  //      "main-a1b2c3d"                → branch="main",                  sha="a1b2c3d"
+  // Split the branch name and SHA from the version string.
+  // Example: "feature/debugToLine-a1b2c3d" -> branch="feature/debugToLine", sha="a1b2c3d"
+  //          "main-a1b2c3d"                -> branch="main",                  sha="a1b2c3d"
   const lastDash   = version.lastIndexOf('-');
   const branch     = lastDash !== -1 ? version.substring(0, lastDash) : '';
   const currentSha = lastDash !== -1 ? version.substring(lastDash + 1) : '';
@@ -40,9 +40,11 @@ function runVersionCommand() {
 function getLatestSha(repo, branch) {
   try {
     const url = 'https://api.github.com/repos/' + repo + '/commits/' + encodeURIComponent(branch);
-    const res = UrlFetchApp.fetch(url, {
+    const res = fetchWithRetry(url, {
       headers: { 'User-Agent': 'GAS-VersionChecker' },
-      muteHttpExceptions: true
+    }, {
+      serviceName: 'GitHub API',
+      operation: 'get latest sha for ' + branch
     });
     if (res.getResponseCode() !== 200) return null;
     return JSON.parse(res.getContentText()).sha || null;

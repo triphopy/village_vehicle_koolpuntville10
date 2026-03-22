@@ -1,6 +1,6 @@
 function runRemoveUserCommand(context) {
   const parts = context.parts;
-  if (parts.length < 2) return '❌ รูปแบบ:\n/remove <userId>';
+  if (parts.length < 2) return '❌ Usage:\n/remove <userId>';
 
   const removeId = parts[1].trim();
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');

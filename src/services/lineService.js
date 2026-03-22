@@ -6,9 +6,11 @@ function getLineDisplayName(userId) {
   if (cached) return cached;
 
   try {
-    const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + userId, {
+    const res = fetchWithRetry('https://api.line.me/v2/bot/profile/' + userId, {
       headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN },
-      muteHttpExceptions: true
+    }, {
+      serviceName: 'LINE Profile API',
+      operation: 'get profile ' + userId
     });
     if (res.getResponseCode() === 200) {
       const name = JSON.parse(res.getContentText()).displayName;
@@ -17,12 +19,13 @@ function getLineDisplayName(userId) {
     }
     return 'User-' + userId.substring(userId.length - 4);
   } catch (e) {
+    console.error('getLineDisplayName fallback: ' + e.message);
     return 'Unknown';
   }
 }
 
 function replyToLine(token, msg) {
-  const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
+  const response = fetchWithRetry('https://api.line.me/v2/bot/message/reply', {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
@@ -31,17 +34,22 @@ function replyToLine(token, msg) {
     payload: JSON.stringify({
       replyToken: token,
       messages: [{ type: 'text', text: msg }]
-    }),
-    muteHttpExceptions: true
+    })
+  }, {
+    serviceName: 'LINE Messaging API',
+    operation: 'reply message'
   });
 
   if (response.getResponseCode() >= 300) {
     console.error('replyToLine failed: ' + response.getResponseCode() + ' ' + response.getContentText());
+    return false;
   }
+
+  return true;
 }
 
 function pushToLine(userId, message) {
-  const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+  const response = fetchWithRetry('https://api.line.me/v2/bot/message/push', {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
@@ -50,11 +58,16 @@ function pushToLine(userId, message) {
     payload: JSON.stringify({
       to: userId,
       messages: [{ type: 'text', text: message }]
-    }),
-    muteHttpExceptions: true
+    })
+  }, {
+    serviceName: 'LINE Messaging API',
+    operation: 'push message'
   });
 
   if (response.getResponseCode() >= 300) {
     console.error('pushToLine failed for ' + userId + ': ' + response.getResponseCode() + ' ' + response.getContentText());
+    return false;
   }
+
+  return true;
 }

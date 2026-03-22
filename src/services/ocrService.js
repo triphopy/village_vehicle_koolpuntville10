@@ -1,5 +1,6 @@
 /**
- * รับ imageId จาก LINE -> ดึงรูป -> ส่ง Gemini 2.5 Flash-Lite -> คืนค่าทะเบียน
+ * Accepts an image ID from LINE, fetches the image, sends it to Gemini 2.5 Flash-Lite,
+ * and returns the detected plate text.
  * @param {string} imageId
  * @returns {string|null}
  */
@@ -128,11 +129,14 @@ function computeImageHash(imageBlob) {
 }
 
 function fetchLineImageBlob(imageId, steps) {
-  const imageResponse = UrlFetchApp.fetch(
+  const imageResponse = fetchWithRetry(
     'https://api-data.line.me/v2/bot/message/' + imageId + '/content',
     {
-      headers: { Authorization: 'Bearer ' + LINE_ACCESS_TOKEN },
-      muteHttpExceptions: true
+      headers: { Authorization: 'Bearer ' + LINE_ACCESS_TOKEN }
+    },
+    {
+      serviceName: 'LINE Content API',
+      operation: 'fetch image ' + imageId
     }
   );
 
@@ -149,12 +153,11 @@ function fetchLineImageBlob(imageId, steps) {
 }
 
 function requestPlateOcr(imageBlob, promptText, maxOutputTokens, steps) {
-  const response = UrlFetchApp.fetch(
+  const response = fetchWithRetry(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY,
     {
       method: 'post',
       contentType: 'application/json',
-      muteHttpExceptions: true,
       payload: JSON.stringify({
         contents: [{
           parts: [
@@ -174,6 +177,10 @@ function requestPlateOcr(imageBlob, promptText, maxOutputTokens, steps) {
           maxOutputTokens: maxOutputTokens || 30
         }
       })
+    },
+    {
+      serviceName: 'Gemini API',
+      operation: 'ocr plate image'
     }
   );
 
@@ -447,13 +454,14 @@ function stringSimilarity(a, b) {
 function editDistance(a, b) {
   const dp = Array.from({ length: b.length + 1 }, function (_, i) { return i; });
   for (let i = 1; i <= a.length; i++) {
-    let prev = i;
+    let prevDiagonal = dp[0];
+    dp[0] = i;
     for (let j = 1; j <= b.length; j++) {
-      const temp = dp[j];
+      const previousRow = dp[j];
       dp[j] = a[i - 1] === b[j - 1]
-        ? dp[j - 1]
-        : 1 + Math.min(dp[j], dp[j - 1], prev);
-      prev = temp;
+        ? prevDiagonal
+        : 1 + Math.min(dp[j], dp[j - 1], prevDiagonal);
+      prevDiagonal = previousRow;
     }
   }
   return dp[b.length];
