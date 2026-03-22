@@ -1,6 +1,6 @@
 /**
  * Vehicle Verification System (Group Event + UID Tracking + OCR)
- * เพิ่ม: OCR ด้วย Gemini 2.5 Flash-Lite + Fuzzy Match
+ * Added OCR with Gemini 2.5 Flash-Lite and fuzzy matching
  */
 
 // ============================

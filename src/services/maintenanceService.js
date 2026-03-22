@@ -111,7 +111,7 @@ function dailyBackup() {
     }
 
     backupFile.moveTo(folder);
-    console.log('Backup สำเร็จ: ' + date);
+    console.log('Backup completed: ' + date);
     return true;
   } catch (err) {
     console.error('dailyBackup failed: ' + err.message);
@@ -131,7 +131,7 @@ function cleanOldBackups() {
       if (file.getDateCreated() < cutoff) file.setTrashed(true);
     }
 
-    console.log('ลบ Backup เก่าเกิน ' + BACKUPRETENTION_DAYS + ' วันแล้ว');
+    console.log('Deleted backups older than ' + BACKUPRETENTION_DAYS + ' days');
     return true;
   } catch (err) {
     console.error('cleanOldBackups failed: ' + err.message);

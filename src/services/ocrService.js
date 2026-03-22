@@ -1,5 +1,6 @@
 /**
- * รับ imageId จาก LINE -> ดึงรูป -> ส่ง Gemini 2.5 Flash-Lite -> คืนค่าทะเบียน
+ * Accepts an image ID from LINE, fetches the image, sends it to Gemini 2.5 Flash-Lite,
+ * and returns the detected plate text.
  * @param {string} imageId
  * @returns {string|null}
  */

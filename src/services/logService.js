@@ -2,6 +2,10 @@ const LOG_BUFFER_CACHE_KEY = 'log_buffer_v1';
 const LOG_BUFFER_MAX_ITEMS = 10;
 const SYSTEM_LOG_BUFFER_CACHE_KEY = 'system_log_buffer_v1';
 const SYSTEM_LOG_BUFFER_MAX_ITEMS = 5;
+const SYSTEM_LOG_IMMEDIATE_LEVELS = {
+  ALERT: true,
+  ERROR: true
+};
 const SYSTEM_LOG_HEADERS = [[
   'TIMESTAMP',
   'LEVEL',
@@ -115,10 +119,11 @@ function writeSystemLog(level, source, eventName, message, detail, userId, conte
   }
 
   try {
+    const normalizedLevel = ((level || 'INFO') + '').toUpperCase();
     const entries = getBufferedSystemLogs();
     entries.push([
       new Date(),
-      level || 'INFO',
+      normalizedLevel,
       source || '-',
       eventName || '-',
       truncateSystemLogValue(message, 200),
@@ -128,7 +133,9 @@ function writeSystemLog(level, source, eventName, message, detail, userId, conte
       requestId || ''
     ]);
     setBufferedSystemLogs(entries);
-    if (entries.length >= SYSTEM_LOG_BUFFER_MAX_ITEMS) {
+    if (SYSTEM_LOG_IMMEDIATE_LEVELS[normalizedLevel]) {
+      flushBufferedSystemLogsInternal();
+    } else if (entries.length >= SYSTEM_LOG_BUFFER_MAX_ITEMS) {
       flushBufferedSystemLogsInternal();
     }
     return true;
