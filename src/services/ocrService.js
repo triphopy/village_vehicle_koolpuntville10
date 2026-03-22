@@ -128,11 +128,14 @@ function computeImageHash(imageBlob) {
 }
 
 function fetchLineImageBlob(imageId, steps) {
-  const imageResponse = UrlFetchApp.fetch(
+  const imageResponse = fetchWithRetry(
     'https://api-data.line.me/v2/bot/message/' + imageId + '/content',
     {
-      headers: { Authorization: 'Bearer ' + LINE_ACCESS_TOKEN },
-      muteHttpExceptions: true
+      headers: { Authorization: 'Bearer ' + LINE_ACCESS_TOKEN }
+    },
+    {
+      serviceName: 'LINE Content API',
+      operation: 'fetch image ' + imageId
     }
   );
 
@@ -149,12 +152,11 @@ function fetchLineImageBlob(imageId, steps) {
 }
 
 function requestPlateOcr(imageBlob, promptText, maxOutputTokens, steps) {
-  const response = UrlFetchApp.fetch(
+  const response = fetchWithRetry(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY,
     {
       method: 'post',
       contentType: 'application/json',
-      muteHttpExceptions: true,
       payload: JSON.stringify({
         contents: [{
           parts: [
@@ -174,6 +176,10 @@ function requestPlateOcr(imageBlob, promptText, maxOutputTokens, steps) {
           maxOutputTokens: maxOutputTokens || 30
         }
       })
+    },
+    {
+      serviceName: 'Gemini API',
+      operation: 'ocr plate image'
     }
   );
 

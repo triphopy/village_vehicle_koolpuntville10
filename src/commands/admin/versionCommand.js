@@ -40,9 +40,11 @@ function runVersionCommand() {
 function getLatestSha(repo, branch) {
   try {
     const url = 'https://api.github.com/repos/' + repo + '/commits/' + encodeURIComponent(branch);
-    const res = UrlFetchApp.fetch(url, {
+    const res = fetchWithRetry(url, {
       headers: { 'User-Agent': 'GAS-VersionChecker' },
-      muteHttpExceptions: true
+    }, {
+      serviceName: 'GitHub API',
+      operation: 'get latest sha for ' + branch
     });
     if (res.getResponseCode() !== 200) return null;
     return JSON.parse(res.getContentText()).sha || null;

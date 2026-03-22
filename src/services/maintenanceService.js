@@ -20,6 +20,7 @@ function dailyCleanup() {
       if (data.length !== toKeep.length) {
         sheet.clearContents();
         sheet.getRange(1, 1, toKeep.length, toKeep[0].length).setValues(toKeep);
+        if (name === 'Visitors') clearVisitorRowMap();
       }
     });
     return true;
@@ -87,6 +88,7 @@ function cleanOldBackups() {
 }
 
 function dailyMaintenance() {
+  flushBufferedLogs();
   const backupOk = dailyBackup();
   const cleanupBackupOk = cleanOldBackups();
   const cleanupOk = dailyCleanup();

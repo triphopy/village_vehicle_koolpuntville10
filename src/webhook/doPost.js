@@ -20,7 +20,16 @@ function parseWebhookRequest(e) {
     };
   }
 
-  const data = JSON.parse(e.postData.contents);
+  let data;
+  try {
+    data = JSON.parse(e.postData.contents);
+  } catch (err) {
+    console.error('parseWebhookRequest invalid json: ' + err.message);
+    return {
+      ok: false,
+      response: ContentService.createTextOutput('Bad Request')
+    };
+  }
 
   return {
     ok: true,

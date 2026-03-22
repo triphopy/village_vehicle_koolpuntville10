@@ -98,6 +98,11 @@ function onEdit(e) {
     cache.remove('vehicles');
     console.log('Auto-cleared vehicle cache due to manual edit');
   }
+
+  if (sheetName === 'Visitors') {
+    clearVisitorRowMap();
+    console.log('Auto-cleared visitor row cache due to manual edit');
+  }
 }
 
 function debugToLine(msg) {
@@ -114,21 +119,9 @@ function debugToLine(msg) {
   }
 
   adminUids.forEach(function (adminUid) {
-    const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'post',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN
-      },
-      payload: JSON.stringify({
-        to: adminUid,
-        messages: [{ type: 'text', text: '[DEBUG]\n' + msg.substring(0, 4900) }]
-      }),
-      muteHttpExceptions: true
-    });
-
-    if (response.getResponseCode() >= 300) {
-      console.error('debugToLine push failed for ' + adminUid + ': ' + response.getContentText());
+    const ok = pushToLine(adminUid, '[DEBUG]\n' + msg.substring(0, 4900));
+    if (!ok) {
+      console.error('debugToLine push failed for ' + adminUid);
     }
   });
 }
