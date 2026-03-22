@@ -2,6 +2,7 @@ const HEALTH_SLOW_CHECK_MS = 1500;
 const HEALTH_SLOW_TOTAL_MS = 3000;
 
 function runHealthCommand(context) {
+  getOrCreateSystemLogSheet();
   const isFullCheck = context.parts && context.parts[1] && context.parts[1].toLowerCase() === 'full';
   const checks = [
     timedHealthCheck('Config', function () { return checkRequiredProperties(); }),
