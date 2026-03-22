@@ -71,6 +71,10 @@ docs/
 
 รายละเอียด flow แบบเต็มดูได้ที่ [docs/architecture-flow.md](/C:/Users/jonew/Downloads/P_Kwan/village_vehicle_koolpuntville10/docs/architecture-flow.md)
 
+หน้าเอกสารหลัก:
+
+- [docs/index.html](/C:/Users/jonew/Downloads/P_Kwan/village_vehicle_koolpuntville10/docs/index.html)
+
 คู่มือที่อัปเดตตาม codebase ปัจจุบัน:
 
 - [docs/user-manual.html](/C:/Users/jonew/Downloads/P_Kwan/village_vehicle_koolpuntville10/docs/user-manual.html)
