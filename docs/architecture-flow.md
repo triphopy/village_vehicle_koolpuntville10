@@ -1,14 +1,14 @@
 # Architecture and Process Flow
 
-เอกสารนี้สรุป flow การทำงานของระบบตั้งแต่รับ webhook จาก LINE ไปจนถึงค้นหาข้อมูล, OCR, admin commands และ deployment
+เอกสารนี้สรุป flow การทำงานของระบบตั้งแต่รับ webhook จาก LINE ไปจนถึงค้นหาข้อมูล, OCR, admin commands, health checks, maintenance และ deployment
 
 ## 1. System Overview
 
 ```mermaid
 flowchart TD
     U["LINE User"] --> LINE["LINE Messaging API"]
-    LINE --> WEBHOOK["GAS Web App<br/>doPost(e)"]
-    WEBHOOK --> PARSE["parseWebhookRequest"]
+    LINE --> WEBHOOK["GAS Web App doPost(e)"]
+    WEBHOOK --> PARSE["parse request + requestId"]
     PARSE --> ROUTER["routeLineEvent"]
 
     ROUTER --> FOLLOW["followHandler"]
@@ -18,25 +18,30 @@ flowchart TD
     TEXT --> STAFF["staffService"]
     TEXT --> SEARCH["vehicleSearchService"]
     TEXT --> ADMIN["adminCommandRouter"]
-    TEXT --> TRACK["visitorService"]
+    TEXT --> VISITOR["visitorService"]
     TEXT --> LOG["logService"]
     TEXT --> LINEAPI["lineService"]
 
     IMAGE --> STAFF
     IMAGE --> OCR["ocrService"]
     IMAGE --> SEARCH
-    IMAGE --> TRACK
+    IMAGE --> VISITOR
     IMAGE --> LOG
     IMAGE --> LINEAPI
 
-    FOLLOW --> LINEAPI
+    ADMIN --> HEALTH["healthCommand"]
+    ADMIN --> SYSLOG["syslogCommand"]
+    ADMIN --> TESTALERT["testAlertCommand"]
+    ADMIN --> VERSION["versionCommand"]
+
     STAFF --> SHEETS["Google Sheets"]
     SEARCH --> SHEETS
-    TRACK --> SHEETS
+    VISITOR --> SHEETS
     LOG --> SHEETS
-    ADMIN --> SHEETS
+    HEALTH --> SHEETS
     OCR --> LINECONTENT["LINE Content API"]
     OCR --> GEMINI["Gemini API"]
+    LINEAPI --> LINEHTTP["LINE Reply / Push / Profile API"]
 ```
 
 ## 2. Component Map
@@ -52,21 +57,23 @@ flowchart LR
         WEBHOOK["Webhook Layer<br/>doPost.js / eventRouter.js"]
         HANDLERS["Handlers<br/>textHandler / imageHandler / followHandler"]
         COMMANDS["Admin Commands<br/>adminCommandRouter + admin/*.js"]
-        SERVICES["Services<br/>staff / search / ocr / line / visitor / log / maintenance"]
+        SERVICES["Services<br/>http / line / log / maintenance / ocr / staff / search / visitor"]
         CORE["Core Config<br/>appCore.js / versionInfo.js"]
     end
 
     subgraph GOOGLE["Google Platform"]
-        SHEETS["Google Sheets<br/>Staff / Vehicles / Visitors / Log"]
+        SHEETS["Google Sheets<br/>Staff / Vehicles / Visitors / Log / SystemLog"]
         DRIVE["Google Drive<br/>Backup Folder"]
         CACHE["GAS CacheService"]
         PROPS["Script Properties"]
+        LOCKS["LockService"]
     end
 
     subgraph EXTERNAL["External APIs"]
-        LINEAPI["LINE Profile / Reply / Push API"]
+        LINEAPI["LINE Messaging APIs"]
         LINECONTENT["LINE Content API"]
         GEMINI["Gemini API"]
+        GITHUB["GitHub API"]
     end
 
     U --> LINE
@@ -79,10 +86,12 @@ flowchart LR
     SERVICES --> SHEETS
     SERVICES --> DRIVE
     SERVICES --> CACHE
+    SERVICES --> LOCKS
     CORE --> PROPS
     SERVICES --> LINEAPI
     SERVICES --> LINECONTENT
     SERVICES --> GEMINI
+    COMMANDS --> GITHUB
 ```
 
 ## 3. Text Query Flow
@@ -90,30 +99,31 @@ flowchart LR
 ```mermaid
 flowchart TD
     A["LINE text message"] --> B["doPost(e)"]
-    B --> C["routeLineEvent"]
-    C --> D["textHandler"]
-    D --> E["getLineDisplayName"]
-    D --> F["getStaff"]
-    F --> G{"staff lookup ok?"}
+    B --> C["generate requestId"]
+    C --> D["routeLineEvent"]
+    D --> E["textHandler"]
+    E --> F["getLineDisplayName"]
+    E --> G["getStaff"]
+    G --> H{"staff lookup ok?"}
 
-    G -- "no, service unavailable" --> H["Reply: ระบบฐานข้อมูลชั่วคราวใช้งานไม่ได้"]
-    G -- "yes" --> I{"allowed group or admin?"}
-    I -- "no" --> J["Reply: ปฏิเสธการใช้งาน"]
-    I -- "yes" --> K["trackUser"]
-    K --> L{"authorized?"}
-    L -- "no" --> M["Reply: ไม่มีสิทธิ์เข้าถึงระบบ"]
-    L -- "yes" --> N{"starts with / ?"}
+    H -- "no, service unavailable" --> I["Reply temporary unavailable"]
+    H -- "yes" --> J{"allowed group or admin?"}
+    J -- "no" --> K["Reply deny group access"]
+    J -- "yes" --> L["trackUser"]
+    L --> M{"authorized?"}
+    M -- "no" --> N["Reply unauthorized"]
+    M -- "yes" --> O{"starts with / ?"}
 
-    N -- "yes" --> O["adminCommandRouter"]
-    O --> P["Admin command"]
-    P --> Q["Reply to LINE"]
+    O -- "yes" --> P["adminCommandRouter"]
+    P --> Q["run admin command with requestId"]
+    Q --> R["Reply to LINE"]
 
-    N -- "no" --> R{"house query?"}
-    R -- "yes" --> S["searchByHouseDetailed"]
-    R -- "no" --> T["searchByPlateDetailed"]
-    S --> U["writeLog"]
-    T --> U
-    U --> V["Reply to LINE"]
+    O -- "no" --> S{"house query?"}
+    S -- "yes" --> T["searchByHouseDetailed"]
+    S -- "no" --> U["searchByPlateDetailed"]
+    T --> V["writeLog (buffered)"]
+    U --> V
+    V --> W["Reply to LINE"]
 ```
 
 ## 4. OCR Image Flow
@@ -121,51 +131,137 @@ flowchart TD
 ```mermaid
 flowchart TD
     A["LINE image message"] --> B["doPost(e)"]
-    B --> C["routeLineEvent"]
-    C --> D["imageHandler"]
-    D --> E["getStaff"]
-    E --> F{"staff lookup ok?"}
+    B --> C["generate requestId"]
+    C --> D["routeLineEvent"]
+    D --> E["imageHandler"]
+    E --> F["getStaff"]
+    F --> G{"staff lookup ok?"}
 
-    F -- "no, service unavailable" --> G["Reply: ระบบฐานข้อมูลชั่วคราวใช้งานไม่ได้"]
-    F -- "yes" --> H{"allowed group or admin?"}
-    H -- "no" --> I["Reply: ปฏิเสธการใช้งาน"]
-    H -- "yes" --> J["trackUser"]
-    J --> K{"authorized?"}
-    K -- "no" --> L["Reply: ไม่มีสิทธิ์เข้าถึงระบบ"]
-    K -- "yes" --> M["extractPlateFromImage"]
+    G -- "no, service unavailable" --> H["Reply temporary unavailable"]
+    G -- "yes" --> I{"allowed group or admin?"}
+    I -- "no" --> J["Reply deny group access"]
+    I -- "yes" --> K["trackUser"]
+    K --> L{"authorized?"}
+    L -- "no" --> M["Reply unauthorized"]
+    L -- "yes" --> N["extractPlateFromImage"]
 
-    M --> N["Fetch image from LINE Content API"]
-    N --> O["OCR with Gemini API"]
-    O --> P{"plate extracted?"}
+    N --> O["Fetch image from LINE Content API"]
+    O --> P["OCR with Gemini API"]
+    P --> Q{"plate extracted?"}
 
-    P -- "no" --> Q{"rate limited?"}
-    Q -- "yes" --> R["Reply: OCR ระบบหนาแน่น"]
-    Q -- "no" --> S["Reply: อ่านป้ายไม่ชัด"]
+    Q -- "no" --> R{"rate limited?"}
+    R -- "yes" --> S["Reply OCR busy + writeSystemLog WARN"]
+    R -- "no" --> T["Reply image unclear"]
 
-    P -- "yes" --> T["resolvePlateFromOcr"]
-    T --> U["searchByPlateDetailed"]
-    U --> V["writeLog"]
-    V --> W["Reply with OCR result and vehicle status"]
+    Q -- "yes" --> U["resolvePlateFromOcr"]
+    U --> V["searchByPlateDetailed"]
+    V --> W["writeLog (buffered)"]
+    W --> X["Reply with OCR result and vehicle status"]
 ```
 
-## 5. Backend Degradation Flow
+## 5. Admin and Ops Flow
 
 ```mermaid
 flowchart TD
-    A["Request needs Google Sheets"] --> B["getCachedSheetData"]
-    B --> C{"fresh cache exists?"}
-    C -- "yes" --> D["Use fresh cache"]
-    C -- "no" --> E["Try live read from SpreadsheetApp"]
-    E --> F{"live read ok?"}
-    F -- "yes" --> G["Cache latest values"]
-    G --> H["Continue flow"]
-    F -- "no" --> I{"stale cache exists?"}
-    I -- "yes" --> J["Use stale cache and log warning"]
-    I -- "no" --> K["Throw ServiceUnavailableError"]
-    K --> L["Handler replies with temporary unavailable message"]
+    A["Admin sends /health /syslog /testalert /version"] --> B["textHandler"]
+    B --> C["adminCommandRouter"]
+    C --> D{"command"}
+
+    D -- "/health" --> E["runHealthCommand"]
+    D -- "/syslog" --> F["runSyslogCommand"]
+    D -- "/testalert" --> G["runTestAlertCommand"]
+    D -- "/version" --> H["runVersionCommand"]
+
+    E --> I["Config / Spreadsheet / Cache / Drive checks"]
+    E --> J["Optional LINE + Gemini live checks in full mode"]
+    E --> K["writeSystemLog on warn/fail/slow"]
+
+    F --> L["flushBufferedSystemLogs"]
+    F --> M["read SystemLog sheet"]
+
+    G --> N["writeSystemLog ALERT"]
+    G --> O["flushBufferedSystemLogs"]
+    G --> P["sendAdminAlert"]
+
+    H --> Q["GitHub repo version check"]
 ```
 
-## 6. Deployment Flow
+## 6. Logging and Fail-soft Flow
+
+```mermaid
+flowchart TD
+    A["Feature needs logging"] --> B{"search log or system log?"}
+    B -- "search log" --> C["writeLog"]
+    B -- "system log" --> D["writeSystemLog"]
+
+    C --> E["buffer in CacheService"]
+    E --> F{"items >= 10 ?"}
+    F -- "yes" --> G["flush to Log sheet"]
+    F -- "no" --> H["wait for explicit flush or maintenance"]
+
+    D --> I["buffer in CacheService"]
+    I --> J{"level is ALERT/ERROR ?"}
+    J -- "yes" --> K["flush to SystemLog immediately"]
+    J -- "no" --> L{"items >= 5 ?"}
+    L -- "yes" --> M["flush to SystemLog"]
+    L -- "no" --> N["wait for explicit flush or maintenance"]
+```
+
+## 7. Maintenance Flow
+
+```mermaid
+flowchart TD
+    A["dailyMaintenance() trigger"] --> B["flushBufferedLogs"]
+    B --> C["flushBufferedSystemLogs"]
+    C --> D["dailyBackup"]
+    D --> E["cleanOldBackups"]
+    E --> F["dailyCleanup"]
+    F --> G{"all steps ok?"}
+    G -- "yes" --> H["write console success"]
+    G -- "no" --> I["sendMaintenanceAlert"]
+    I --> J["writeSystemLog ALERT"]
+    I --> K["push LINE alert to admins"]
+```
+
+## 8. Request Tracing
+
+- `doPost(e)` สร้าง `requestId` สำหรับ request ใหม่
+- `eventRouter`, handlers และ admin commands จะส่ง `requestId` ต่อไป
+- `SystemLog` บันทึก `REQUEST_ID` เพื่อใช้ trace incident
+- `/syslog` แสดง `req:` ให้เช็กความเชื่อมโยงของ event ได้เร็วขึ้น
+
+## 9. Main Components
+
+- `src/appCore.js`
+  เก็บ shared config, column map, trigger hooks, admin alert helper
+- `src/webhook/doPost.js`
+  รับ webhook, parse payload, สร้าง `requestId`, log invalid payload
+- `src/webhook/eventRouter.js`
+  แยก follow, text, image
+- `src/handlers/textHandler.js`
+  flow ค้นหาข้อความ, help, `/myid`, admin command entry point
+- `src/handlers/imageHandler.js`
+  flow OCR จากภาพ และ fallback กรณี OCR fail/rate limit
+- `src/services/httpService.js`
+  wrapper สำหรับ retry, timeout และ error handling ของ external HTTP
+- `src/services/staffService.js`
+  lookup staff, cache, graceful handling เมื่อ Sheets มีปัญหา
+- `src/services/vehicleSearchService.js`
+  ค้นหาทะเบียนและบ้านเลขที่
+- `src/services/ocrService.js`
+  OCR, normalization, fuzzy matching, candidate generation
+- `src/services/visitorService.js`
+  อัปเดตผู้ใช้ที่เคยใช้งาน พร้อม row map cache
+- `src/services/logService.js`
+  จัดการ `Log`, `SystemLog`, buffering, flush และ auto-create `SystemLog`
+- `src/services/maintenanceService.js`
+  backup, cleanup, retention และ alert เมื่อ maintenance fail บางส่วน
+- `src/commands/admin/*.js`
+  แยก logic รายคำสั่ง เช่น `/health`, `/syslog`, `/testalert`, `/version`
+- `tests/pure-logic.test.js`
+  local automated tests สำหรับ pure logic
+
+## 10. Deployment Flow
 
 ```mermaid
 flowchart TD
@@ -183,16 +279,25 @@ flowchart TD
     K -- "no" --> M["GREEN / Staging GAS"]
 ```
 
-## 7. Main Components
+## 11. Automated Tests
 
-- `src/webhook/doPost.js`: รับ webhook และกัน error ชั้นนอก
-- `src/webhook/eventRouter.js`: แยก follow, text, image
-- `src/handlers/textHandler.js`: flow ค้นหาข้อความและ admin entry point
-- `src/handlers/imageHandler.js`: flow OCR จากภาพ
-- `src/services/staffService.js`: lookup staff, cache, graceful handling เมื่อ Sheets มีปัญหา
-- `src/services/vehicleSearchService.js`: ค้นหาทะเบียนและบ้านเลขที่
-- `src/services/ocrService.js`: OCR, normalization, fuzzy matching
-- `src/services/logService.js`: เขียน log แบบ fail-soft
-- `src/services/visitorService.js`: อัปเดตผู้ใช้ที่เคยใช้งานแบบ fail-soft
-- `src/services/maintenanceService.js`: backup และ cleanup jobs
-- `.github/workflows/deploy.yml`: deploy ไป GAS อัตโนมัติตาม branch
+ก่อน deploy หรือก่อน push logic สำคัญ แนะนำให้รัน:
+
+```bash
+node tests/pure-logic.test.js
+```
+
+หรือ:
+
+```bash
+npm test
+```
+
+ชุด test ปัจจุบันครอบคลุม:
+
+- plate normalization
+- OCR cleanup
+- OCR candidate generation
+- OCR result resolution
+- edit distance
+- string similarity

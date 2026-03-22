@@ -1,0 +1,451 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Technical Guide — ระบบตรวจสอบทะเบียนรถ</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1320;
+    --panel: #171d2d;
+    --panel-2: #1d2436;
+    --panel-3: #0b1020;
+    --border: rgba(255,255,255,0.08);
+    --text: #e7ecf7;
+    --muted: #a7b2c9;
+    --blue: #7aa6ff;
+    --blue-bg: rgba(122,166,255,0.12);
+    --green: #52d693;
+    --green-bg: rgba(82,214,147,0.12);
+    --amber: #f4c44f;
+    --amber-bg: rgba(244,196,79,0.12);
+    --red: #ff8d8d;
+    --red-bg: rgba(255,141,141,0.12);
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans Thai', sans-serif;
+    --shadow: 0 20px 60px rgba(0,0,0,0.28);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background: radial-gradient(circle at top right, rgba(122,166,255,0.08), transparent 20%), var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+  }
+  .hero {
+    padding: 56px 24px 40px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0));
+  }
+  .hero-inner, .wrap { max-width: 1020px; margin: 0 auto; }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid rgba(82,214,147,0.18);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  h1 {
+    margin: 18px 0 10px;
+    font-size: 38px;
+    line-height: 1.16;
+    color: #fff;
+  }
+  .subtitle {
+    max-width: 760px;
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  .badge {
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-family: var(--mono);
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--muted);
+  }
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(15,19,32,0.90);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    max-width: 1020px;
+    margin: 0 auto;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 0 12px;
+  }
+  .nav a {
+    display: inline-block;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 14px 12px;
+    font-size: 14px;
+  }
+  .nav a:hover { color: #fff; }
+  .section {
+    margin: 28px auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    padding: 28px;
+  }
+  .section h2 {
+    margin: 0 0 12px;
+    font-size: 24px;
+    color: #fff;
+  }
+  .section h3 {
+    margin-top: 22px;
+    margin-bottom: 10px;
+    font-size: 18px;
+    color: #fff;
+  }
+  .section p, .section li { color: var(--muted); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+  }
+  .card {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 18px;
+  }
+  .card strong { display: block; margin-bottom: 8px; color: #fff; }
+  .steps {
+    display: grid;
+    gap: 14px;
+    margin-top: 18px;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+  }
+  .num {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--blue);
+    background: var(--blue-bg);
+    border: 1px solid rgba(122,166,255,0.18);
+  }
+  code, pre { font-family: var(--mono); }
+  code {
+    background: var(--panel-3);
+    color: var(--blue);
+    padding: 2px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+  }
+  pre {
+    background: #0a0f1a;
+    color: #e8eefc;
+    border-radius: 16px;
+    padding: 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.65;
+    border: 1px solid var(--border);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  th { color: #fff; background: rgba(255,255,255,0.03); }
+  .note {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: var(--blue-bg);
+    border: 1px solid rgba(122,166,255,0.18);
+    color: var(--text);
+  }
+  .ok { color: var(--green); }
+  .warn { color: var(--amber); }
+  .bad { color: var(--red); }
+  .footer {
+    max-width: 1020px;
+    margin: 0 auto 40px;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 0 8px;
+  }
+  @media (max-width: 760px) {
+    h1 { font-size: 31px; }
+    .section { padding: 22px 18px; }
+    .step { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="eyebrow">TECHNICAL GUIDE <span>Google Apps Script + LINE Bot</span></div>
+      <h1>คู่มือเชิงเทคนิคสำหรับระบบตรวจสอบทะเบียนรถ</h1>
+      <p class="subtitle">เอกสารนี้อัปเดตให้ตรงกับ codebase และ deployment flow ปัจจุบัน ครอบคลุมสถาปัตยกรรม, commands, logging, maintenance, runtime sheets, local tests และวิธีตรวจสุขภาพระบบในงานจริง</p>
+      <div class="badge-row">
+        <span class="badge">rootDir: <code>src/</code></span>
+        <span class="badge">Platform: <code>Google Apps Script</code></span>
+        <span class="badge">Bot: <code>LINE Messaging API</code></span>
+        <span class="badge">OCR: <code>Gemini API</code></span>
+        <span class="badge">Deploy: <code>GitHub Actions + clasp</code></span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="#architecture">Architecture</a>
+      <a href="#setup">Setup</a>
+      <a href="#sheets">Sheets</a>
+      <a href="#properties">Script Properties</a>
+      <a href="#commands">Admin Commands</a>
+      <a href="#ops">Ops & Logging</a>
+      <a href="#deploy">Deploy</a>
+      <a href="#tests">Tests</a>
+    </div>
+  </nav>
+
+  <main class="wrap">
+    <section class="section" id="architecture">
+      <h2>Architecture Overview</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>Webhook layer</strong>
+          <p><code>doPost(e)</code> รับ webhook จาก LINE, parse payload, สร้าง <code>requestId</code> และ route event ไปยัง handler ที่เหมาะสม</p>
+        </div>
+        <div class="card">
+          <strong>Handlers</strong>
+          <p><code>textHandler</code>, <code>imageHandler</code>, <code>followHandler</code> แยก flow ข้อความ, OCR และ follow event ออกจากกัน</p>
+        </div>
+        <div class="card">
+          <strong>Services</strong>
+          <p>รวม logic สำหรับ LINE API, OCR, vehicle search, visitors, logs, maintenance และ HTTP retry wrapper</p>
+        </div>
+        <div class="card">
+          <strong>Admin command layer</strong>
+          <p>คำสั่ง admin ถูกแยกเป็นไฟล์ย่อย เช่น <code>/health</code>, <code>/syslog</code>, <code>/testalert</code>, <code>/version</code></p>
+        </div>
+      </div>
+
+      <h3>Runtime flow แบบย่อ</h3>
+      <div class="steps">
+        <div class="step"><div class="num">01</div><div><strong>LINE ส่ง event มาที่ GAS Web App</strong><p><code>doPost(e)</code> เป็น entrypoint หลักของระบบ</p></div></div>
+        <div class="step"><div class="num">02</div><div><strong>ระบบ route event ไปยัง handler</strong><p>ข้อความจะเข้า <code>textHandler</code>, รูปภาพจะเข้า <code>imageHandler</code></p></div></div>
+        <div class="step"><div class="num">03</div><div><strong>handler เรียก services ตามประเภทงาน</strong><p>เช่น lookup staff, search vehicle, OCR, logging, visitor tracking</p></div></div>
+        <div class="step"><div class="num">04</div><div><strong>admin commands ถูก dispatch แยกตามคำสั่ง</strong><p>ลด conflict และทำให้แก้ command รายตัวได้ง่าย</p></div></div>
+      </div>
+    </section>
+
+    <section class="section" id="setup">
+      <h2>Setup และ Prerequisites</h2>
+      <h3>สิ่งที่ต้องมี</h3>
+      <ul>
+        <li>Google Spreadsheet สำหรับ `Staff`, `Vehicles`, `Visitors`, `Log`, `SystemLog`</li>
+        <li>Google Apps Script project ที่ผูกกับ spreadsheet หรือเข้าถึง spreadsheet เป้าหมายได้</li>
+        <li>LINE Official Account + Messaging API channel</li>
+        <li>Gemini API key</li>
+        <li>GitHub repository secrets สำหรับ deployment ถ้าใช้ GitHub Actions</li>
+      </ul>
+
+      <h3>โครงสร้างหลักของ source</h3>
+      <pre>src/
+  appCore.js
+  versionInfo.js
+  webhook/
+  handlers/
+  services/
+  commands/
+
+tests/
+  pure-logic.test.js</pre>
+
+      <div class="note">ไฟล์ <code>src/versionInfo.js</code> เป็น fallback file ที่ CI จะเขียนทับระหว่าง deploy เพื่อใส่ version metadata ของ deployment ปัจจุบัน</div>
+    </section>
+
+    <section class="section" id="sheets">
+      <h2>Google Sheets และ Runtime Data</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ชีต</th>
+            <th>หน้าที่</th>
+            <th>ข้อสังเกต</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Staff</code></td><td>เก็บชื่อ, UID, status, role</td><td>เป็น master data สำหรับสิทธิ์และ admin detection</td></tr>
+          <tr><td><code>Vehicles</code></td><td>เก็บทะเบียน, รุ่น, สี, บ้านเลขที่, เจ้าของ, สถานะ</td><td>ใช้ทั้ง search และ OCR matching</td></tr>
+          <tr><td><code>Visitors</code></td><td>เก็บผู้ใช้ที่เคยใช้งานและเวลาใช้งานล่าสุด</td><td>มี row map cache เพื่อให้ update เร็วขึ้น</td></tr>
+          <tr><td><code>Log</code></td><td>เก็บ search logs</td><td>buffer writes เพื่อลดการเขียนชีตถี่เกินไป</td></tr>
+          <tr><td><code>SystemLog</code></td><td>เก็บ operational events ระดับระบบ</td><td>runtime สามารถสร้างชีตนี้ให้อัตโนมัติพร้อม header ได้</td></tr>
+        </tbody>
+      </table>
+
+      <h3>SystemLog schema</h3>
+      <pre>TIMESTAMP | LEVEL | SOURCE | EVENT | MESSAGE | DETAIL | USER_ID | CONTEXT | REQUEST_ID</pre>
+      <p>ใช้สำหรับ health summaries, maintenance alerts, admin command failures, OCR rate-limit warnings, invalid webhook payloads และ event สำคัญอื่น ๆ</p>
+    </section>
+
+    <section class="section" id="properties">
+      <h2>Script Properties</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>หน้าที่</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>LINE_ACCESS_TOKEN</code></td><td>ใช้ reply, push, profile lookup</td></tr>
+          <tr><td><code>LINE_CHANNEL_SECRET</code></td><td>เก็บ channel secret ของ LINE</td></tr>
+          <tr><td><code>GEMINI_API_KEY</code></td><td>ใช้ OCR และ health full check</td></tr>
+          <tr><td><code>SPREADSHEET_ID</code></td><td>ระบุ spreadsheet หลักของระบบ</td></tr>
+          <tr><td><code>ALLOWED_GROUP_IDS</code></td><td>allowlist ของ LINE group สำหรับ staff</td></tr>
+          <tr><td><code>ADMIN_UID</code></td><td>ใช้ส่ง admin alerts ผ่าน LINE</td></tr>
+          <tr><td><code>LOG_RETENTION_DAYS</code></td><td>retention ของ `Log`, `Visitors`, `SystemLog`</td></tr>
+          <tr><td><code>BACKUP_RETENTION_DAYS</code></td><td>retention ของ backup files ใน Drive</td></tr>
+          <tr><td><code>BACKUP_FOLDER_NAME</code></td><td>ชื่อโฟลเดอร์ backup บน Drive</td></tr>
+          <tr><td><code>DEBUG_MODE</code></td><td>เปิด/ปิดการส่ง debug message ไปหา admin</td></tr>
+          <tr><td><code>GITHUB_REPO</code></td><td>ใช้ให้ <code>/version</code> เปรียบเทียบ SHA กับ GitHub</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" id="commands">
+      <h2>Admin Commands</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Use case</th>
+            <th>หมายเหตุ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/add</code>, <code>/remove</code>, <code>/setstatus</code>, <code>/setrole</code></td><td>จัดการข้อมูล Staff</td><td>ใช้งานผ่าน LINE ได้โดยตรง</td></tr>
+          <tr><td><code>/list</code>, <code>/status</code>, <code>/whois</code>, <code>/visitors</code></td><td>ตรวจข้อมูลผู้ใช้และการใช้งาน</td><td>เหมาะกับ support และ auditing เบื้องต้น</td></tr>
+          <tr><td><code>/log &lt;count&gt;</code></td><td>อ่าน search logs ล่าสุด</td><td>flush buffered logs ก่อนอ่าน</td></tr>
+          <tr><td><code>/syslog &lt;count&gt;</code></td><td>อ่าน system logs ล่าสุด</td><td>แสดงเวลา, level, source, event, requestId</td></tr>
+          <tr><td><code>/health</code></td><td>ตรวจสุขภาพระบบแบบ default</td><td>ไม่ยิง LINE/Gemini live check</td></tr>
+          <tr><td><code>/health full</code></td><td>ตรวจสุขภาพระบบแบบ live</td><td>ยิง LINE Profile API และ Gemini API จริง</td></tr>
+          <tr><td><code>/testalert</code></td><td>ยืนยันว่า LINE admin alert และ SystemLog ยังทำงานได้</td><td>ใช้เทส staging/prod โดยไม่ต้องทำให้ระบบ fail</td></tr>
+          <tr><td><code>/clearcache</code></td><td>ล้าง runtime cache</td><td>ใช้หลังแก้ชีตแล้วผลยังไม่อัปเดต</td></tr>
+          <tr><td><code>/version</code></td><td>ดู deployment version และ GitHub SHA</td><td>อาศัย `GITHUB_REPO` สำหรับ latest commit check</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" id="ops">
+      <h2>Ops, Logging และ Maintenance</h2>
+      <h3>HTTP layer และ retry</h3>
+      <p><code>httpService.js</code> รวม logic ของ <code>fetchWithRetry()</code> และ <code>fetchJsonWithRetry()</code> เพื่อใช้กับ LINE API, Gemini API และ GitHub API โดยให้ retry และจัดหมวดหมู่ error กลางที่เดียว</p>
+
+      <h3>Buffered logging</h3>
+      <ul>
+        <li><code>Log</code> buffer สูงสุด 10 รายการก่อน flush</li>
+        <li><code>SystemLog</code> buffer สูงสุด 5 รายการสำหรับ <code>WARN</code> และ <code>INFO</code></li>
+        <li><code>ALERT</code> และ <code>ERROR</code> flush ลงชีตทันที</li>
+      </ul>
+
+      <h3>Health check behavior</h3>
+      <ul>
+        <li><code>/health</code> ตรวจ config, spreadsheet, cache, drive และสร้าง <code>SystemLog</code> ให้ถ้ายังไม่มี</li>
+        <li><code>/health full</code> เพิ่ม live checks ของ LINE และ Gemini</li>
+        <li>health summary จะถูกเขียนลง <code>SystemLog</code> เมื่อมี <span class="warn">warn</span>, <span class="bad">fail</span> หรือ response ช้า</li>
+      </ul>
+
+      <h3>Maintenance jobs</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th>หน้าที่</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>keepAlive()</code></td><td>ใช้เป็น trigger เบา ๆ เพื่อให้ script ตื่นอยู่เมื่อจำเป็น</td></tr>
+          <tr><td><code>dailyBackup()</code></td><td>สำรอง spreadsheet ไปยังโฟลเดอร์ backup</td></tr>
+          <tr><td><code>cleanOldBackups()</code></td><td>ลบ backup เก่าตาม retention</td></tr>
+          <tr><td><code>dailyCleanup()</code></td><td>ล้างข้อมูลเก่าจาก `Log`, `Visitors`, `SystemLog`</td></tr>
+          <tr><td><code>dailyMaintenance()</code></td><td>run backup + cleanup + alert เมื่อเกิด partial failures</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note">เมื่อ maintenance step ใด fail ระบบจะส่ง LINE alert ไปยัง admin และเขียน <code>maintenance_partial_failure</code> ลง <code>SystemLog</code></div>
+    </section>
+
+    <section class="section" id="deploy">
+      <h2>Deployment Flow</h2>
+      <div class="steps">
+        <div class="step"><div class="num">01</div><div><strong>Push code ไปยัง GitHub</strong><p>branch <code>main</code> ใช้สำหรับ production และ <code>feature/**</code> ใช้สำหรับ staging</p></div></div>
+        <div class="step"><div class="num">02</div><div><strong>GitHub Actions รัน workflow</strong><p>workflow จะติดตั้ง <code>@google/clasp</code> และเขียนไฟล์ credentials ที่จำเป็น</p></div></div>
+        <div class="step"><div class="num">03</div><div><strong>CI เขียน <code>src/versionInfo.js</code></strong><p>เพื่อ inject branch, SHA และ metadata ของ deployment ล่าสุด</p></div></div>
+        <div class="step"><div class="num">04</div><div><strong>Deploy ด้วย clasp</strong><p>รัน <code>clasp push --force</code> แล้วตามด้วย <code>clasp deploy</code></p></div></div>
+      </div>
+
+      <pre>main        -> BLUE / production GAS
+feature/**  -> GREEN / staging GAS</pre>
+    </section>
+
+    <section class="section" id="tests">
+      <h2>Local Tests</h2>
+      <p>โปรเจกต์มี automated tests แบบ lightweight สำหรับ pure logic ที่ไม่ต้องใช้ GAS runtime จริง</p>
+      <pre>node tests/pure-logic.test.js
+npm test</pre>
+      <ul>
+        <li>ครอบคลุม plate normalization</li>
+        <li>ครอบคลุม OCR cleanup และ candidate generation</li>
+        <li>ครอบคลุม OCR result resolution</li>
+        <li>ครอบคลุม string similarity และ edit distance</li>
+      </ul>
+      <div class="note">ถ้า PowerShell ของเครื่องบล็อก <code>npm.ps1</code> ให้ใช้ <code>node tests/pure-logic.test.js</code> แทนได้ทันที</div>
+    </section>
+  </main>
+
+  <div class="footer">
+    อัปเดตตาม codebase ปัจจุบันของโปรเจกต์ Vehicle Verification System รวมงานด้าน staging hardening, system health checks, alerts และ logging ล่าสุด
+  </div>
+</body>
+</html>

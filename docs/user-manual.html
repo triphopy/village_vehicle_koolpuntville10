@@ -1,0 +1,461 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Manual — ระบบตรวจสอบทะเบียนรถ</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f8fb;
+    --panel: #ffffff;
+    --panel-2: #f0f4fa;
+    --border: #d9e2ef;
+    --text: #132238;
+    --muted: #5a6c82;
+    --blue: #1959d1;
+    --blue-soft: #e8f0ff;
+    --green: #117a45;
+    --green-soft: #e8f7ef;
+    --amber: #9a6700;
+    --amber-soft: #fff3d8;
+    --red: #b42318;
+    --red-soft: #feeceb;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans Thai', sans-serif;
+    --shadow: 0 16px 40px rgba(19,34,56,0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background: linear-gradient(180deg, #eff4fb 0%, #f8fafc 220px, #f6f8fb 100%);
+    color: var(--text);
+    line-height: 1.75;
+  }
+  .hero {
+    padding: 56px 24px 36px;
+    background: radial-gradient(circle at top right, rgba(25,89,209,0.10), transparent 35%), linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-inner, .wrap { max-width: 980px; margin: 0 auto; }
+  .eyebrow {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--blue);
+    background: var(--blue-soft);
+    border: 1px solid #cdddff;
+    border-radius: 999px;
+    padding: 6px 12px;
+  }
+  h1 {
+    margin: 18px 0 10px;
+    font-size: 36px;
+    line-height: 1.18;
+  }
+  .subtitle {
+    max-width: 720px;
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .quick-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-top: 28px;
+  }
+  .quick-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .quick-card strong { display: block; margin-bottom: 6px; }
+  .quick-card p { margin: 0; color: var(--muted); font-size: 14px; }
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(246,248,251,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    max-width: 980px;
+    margin: 0 auto;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 0 12px;
+  }
+  .nav a {
+    display: inline-block;
+    padding: 14px 12px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .nav a:hover { color: var(--blue); }
+  .section {
+    margin: 28px auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 28px;
+    box-shadow: var(--shadow);
+  }
+  .section h2 {
+    margin: 0 0 12px;
+    font-size: 24px;
+  }
+  .section h3 {
+    margin-top: 22px;
+    margin-bottom: 10px;
+    font-size: 18px;
+  }
+  .section p, .section li { color: var(--muted); }
+  .pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 14px 0 0;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+  }
+  .ok { background: var(--green-soft); color: var(--green); border-color: #cfead8; }
+  .warn { background: var(--amber-soft); color: var(--amber); border-color: #f2d99b; }
+  .danger { background: var(--red-soft); color: var(--red); border-color: #f4c6c2; }
+  .blue { background: var(--blue-soft); color: var(--blue); border-color: #cdddff; }
+  .steps {
+    display: grid;
+    gap: 14px;
+    margin-top: 18px;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 14px;
+    align-items: start;
+    background: #fbfcfe;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+  }
+  .num {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--blue-soft);
+    color: var(--blue);
+    font-family: var(--mono);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    border: 1px solid #cdddff;
+  }
+  code, pre {
+    font-family: var(--mono);
+  }
+  code {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 6px;
+    color: var(--blue);
+    font-size: 12px;
+  }
+  pre {
+    background: #0f172a;
+    color: #e5eefc;
+    border-radius: 16px;
+    padding: 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+  th, td {
+    border-bottom: 1px solid var(--border);
+    padding: 12px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--panel-2);
+    color: var(--text);
+  }
+  .note {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: var(--blue-soft);
+    border: 1px solid #cdddff;
+    color: var(--text);
+  }
+  .footer {
+    max-width: 980px;
+    margin: 0 auto 40px;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 0 8px;
+  }
+  @media (max-width: 720px) {
+    h1 { font-size: 30px; }
+    .section { padding: 22px 18px; border-radius: 18px; }
+    .step { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="eyebrow">USER MANUAL <span>LINE Vehicle Verification</span></div>
+      <h1>คู่มือการใช้งานระบบตรวจสอบทะเบียนรถผ่าน LINE Bot</h1>
+      <p class="subtitle">เอกสารฉบับนี้อัปเดตตามโค้ดและ feature ล่าสุดของระบบ รวมทั้งการค้นหาทะเบียน, OCR, คำสั่ง admin, health checks, alerts และโครงสร้างชีตที่ใช้งานจริงในปัจจุบัน</p>
+      <div class="quick-grid">
+        <div class="quick-card">
+          <strong>ผู้ใช้งานทั่วไป</strong>
+          <p>ใช้ <code>/myid</code> และ <code>/help</code> ได้ทันที แม้ยังไม่ได้รับสิทธิ์ในระบบ</p>
+        </div>
+        <div class="quick-card">
+          <strong>เจ้าหน้าที่และลูกบ้านที่ได้รับสิทธิ์</strong>
+          <p>ค้นหาทะเบียนรถ, บ้านเลขที่ และส่งรูปเพื่อ OCR ได้ในกลุ่มที่อนุญาต</p>
+        </div>
+        <div class="quick-card">
+          <strong>Admin</strong>
+          <p>จัดการสิทธิ์, ตรวจสุขภาพระบบ, ดู system logs และทดสอบ alert pipeline ได้จาก LINE</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="#start">เริ่มต้นใช้งาน</a>
+      <a href="#search">ค้นหาข้อมูลรถ</a>
+      <a href="#admin">คำสั่ง Admin</a>
+      <a href="#roles">สิทธิ์ผู้ใช้งาน</a>
+      <a href="#sheets">โครงสร้างข้อมูล</a>
+      <a href="#ops">สุขภาพระบบและปัญหาที่พบบ่อย</a>
+    </div>
+  </nav>
+
+  <main class="wrap">
+    <section class="section" id="start">
+      <h2>วิธีเริ่มใช้งานระบบ</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="num">01</div>
+          <div>
+            <strong>เพิ่ม Bot หรือเปิดแชตกับ Bot</strong>
+            <p>ระบบนี้ทำงานบน LINE Bot ผู้ใช้ทุกคนสามารถเริ่มด้วยการส่ง <code>/myid</code> เพื่อดู User ID ของตัวเองได้ก่อน</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">02</div>
+          <div>
+            <strong>ส่ง <code>/help</code> เพื่อดูคำสั่งที่ใช้ได้</strong>
+            <p>ถ้าเป็น admin ระบบจะโชว์คำสั่งสำหรับจัดการข้อมูลและ monitoring เพิ่มเติมให้อัตโนมัติ</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">03</div>
+          <div>
+            <strong>ถ้ายังไม่มีสิทธิ์ ให้ส่ง User ID ให้ผู้ดูแล</strong>
+            <p>Admin จะนำ User ID ไปเพิ่มในชีต <code>Staff</code> พร้อมกำหนด role และสถานะการใช้งาน</p>
+          </div>
+        </div>
+      </div>
+      <pre>/myid
+/help</pre>
+      <div class="note">หมายเหตุ: ผู้ใช้ที่ยังไม่ได้ลงทะเบียนจะยังใช้ค้นหาข้อมูลรถไม่ได้ แต่ยังดู <code>/myid</code> และ <code>/help</code> ได้</div>
+    </section>
+
+    <section class="section" id="search">
+      <h2>วิธีค้นหาข้อมูลรถ</h2>
+      <p>ระบบรองรับทั้งการค้นหาจากข้อความและจากรูปภาพทะเบียนรถ โดยผลลัพธ์จะอิงข้อมูลในชีต <code>Vehicles</code></p>
+
+      <h3>ค้นหาด้วยข้อความ</h3>
+      <ul>
+        <li>พิมพ์ทะเบียนตรง ๆ เช่น <code>กข1234</code></li>
+        <li>พิมพ์ทะเบียนแบบมีขีดหรือช่องว่าง เช่น <code>80-1234</code>, <code>3 ขฮ 8777</code></li>
+        <li>พิมพ์บ้านเลขที่ เช่น <code>1/23</code></li>
+      </ul>
+      <pre>กข1234
+80-1234
+1/23</pre>
+
+      <h3>ค้นหาด้วยรูปภาพ</h3>
+      <ul>
+        <li>ส่งรูปป้ายทะเบียนในแชตกลุ่มที่อนุญาต</li>
+        <li>ระบบจะดึงภาพจาก LINE Content API แล้วส่งต่อให้ Gemini ช่วยอ่านทะเบียน</li>
+        <li>ถ้าพบเลขใกล้เคียง ระบบจะแสดงรายการที่อาจเป็นและสรุปผลตรวจให้</li>
+      </ul>
+
+      <h3>ผลลัพธ์ที่อาจพบ</h3>
+      <div class="pill-row">
+        <span class="pill ok">พบข้อมูลและรถ active</span>
+        <span class="pill warn">ไม่พบตรงตัว แต่มีรายการใกล้เคียง</span>
+        <span class="pill danger">ไม่พบข้อมูล หรือ OCR อ่านไม่ชัด</span>
+      </div>
+      <div class="note">ข้อความตอบกลับผู้ใช้งานยังคงเป็นภาษาไทยตามการใช้งานจริงของหน้างาน</div>
+    </section>
+
+    <section class="section" id="admin">
+      <h2>คำสั่ง Admin</h2>
+      <p>คำสั่งด้านล่างใช้ได้เฉพาะผู้ใช้ที่มี role เป็น <code>admin</code> เท่านั้น</p>
+      <table>
+        <thead>
+          <tr>
+            <th>คำสั่ง</th>
+            <th>หน้าที่</th>
+            <th>ตัวอย่าง</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/add &lt;userId&gt; &lt;name&gt; &lt;role&gt;</code></td><td>เพิ่มผู้ใช้ในชีต Staff</td><td><code>/add U12345 Somchai staff</code></td></tr>
+          <tr><td><code>/remove &lt;userId&gt;</code></td><td>ลบผู้ใช้ออกจากระบบ</td><td><code>/remove U12345</code></td></tr>
+          <tr><td><code>/setstatus &lt;userId&gt; &lt;active|inactive&gt;</code></td><td>เปลี่ยนสถานะการใช้งาน</td><td><code>/setstatus U12345 active</code></td></tr>
+          <tr><td><code>/setrole &lt;userId&gt; &lt;admin|staff&gt;</code></td><td>เปลี่ยน role ของผู้ใช้</td><td><code>/setrole U12345 admin</code></td></tr>
+          <tr><td><code>/list</code></td><td>ดูรายชื่อ staff และ admin</td><td><code>/list</code></td></tr>
+          <tr><td><code>/status &lt;userId&gt;</code></td><td>ดูข้อมูลผู้ใช้รายคน</td><td><code>/status U12345</code></td></tr>
+          <tr><td><code>/whois</code></td><td>ดูข้อมูลผู้ส่งคำสั่งปัจจุบัน</td><td><code>/whois</code></td></tr>
+          <tr><td><code>/visitors</code></td><td>ดูผู้ใช้งานล่าสุดจากชีต Visitors</td><td><code>/visitors</code></td></tr>
+          <tr><td><code>/log &lt;count&gt;</code></td><td>ดู search log ล่าสุด</td><td><code>/log 10</code></td></tr>
+          <tr><td><code>/syslog &lt;count&gt;</code></td><td>ดู SystemLog ล่าสุด</td><td><code>/syslog 10</code></td></tr>
+          <tr><td><code>/health</code></td><td>ตรวจสุขภาพระบบแบบเบา ไม่ยิง LINE/Gemini live check</td><td><code>/health</code></td></tr>
+          <tr><td><code>/health full</code></td><td>ตรวจสุขภาพระบบแบบเต็ม รวม live check ของ LINE และ Gemini</td><td><code>/health full</code></td></tr>
+          <tr><td><code>/testalert</code></td><td>ทดสอบ admin alert pipeline และเขียน SystemLog ทันที</td><td><code>/testalert</code></td></tr>
+          <tr><td><code>/clearcache</code></td><td>ล้าง cache ที่เกี่ยวกับข้อมูลระบบ</td><td><code>/clearcache</code></td></tr>
+          <tr><td><code>/version</code></td><td>ดู version และ SHA ปัจจุบัน</td><td><code>/version</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>คำสั่งสำหรับ monitoring</h3>
+      <ul>
+        <li><code>/health</code> ใช้ตรวจ config, spreadsheet, cache และ drive แบบเร็ว</li>
+        <li><code>/health full</code> ใช้ตอน debug เมื่ออยากรู้ว่า LINE API และ Gemini API ใช้งานจริงได้หรือไม่</li>
+        <li><code>/syslog 10</code> ใช้ดู system events ล่าสุดโดยไม่ต้องเปิด Google Sheets</li>
+        <li><code>/testalert</code> ใช้ยืนยันว่า LINE admin alert และ SystemLog ยังทำงานอยู่</li>
+      </ul>
+    </section>
+
+    <section class="section" id="roles">
+      <h2>ประเภทผู้ใช้งานและสิทธิ์</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ประเภท</th>
+            <th>สิ่งที่ทำได้</th>
+            <th>ข้อจำกัด</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ยังไม่ลงทะเบียน</td>
+            <td><code>/myid</code>, <code>/help</code></td>
+            <td>ยังค้นหาข้อมูลและใช้ OCR ไม่ได้</td>
+          </tr>
+          <tr>
+            <td>staff</td>
+            <td>ค้นหาทะเบียน, ค้นหาบ้านเลขที่, ส่งรูป OCR</td>
+            <td>ต้องใช้งานในกลุ่มที่อยู่ใน <code>ALLOWED_GROUP_IDS</code> เว้นแต่จะเป็น admin</td>
+          </tr>
+          <tr>
+            <td>admin</td>
+            <td>ใช้ทุกคำสั่ง รวมทั้ง monitoring และ maintenance support</td>
+            <td>ไม่มีข้อจำกัดเรื่อง allowlist group สำหรับงานค้นหา</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" id="sheets">
+      <h2>โครงสร้าง Spreadsheet</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ชีต</th>
+            <th>หน้าที่</th>
+            <th>หมายเหตุ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Staff</code></td><td>เก็บชื่อ, UID, status, role</td><td>เป็น master data สำหรับสิทธิ์ผู้ใช้</td></tr>
+          <tr><td><code>Vehicles</code></td><td>เก็บทะเบียนรถ, บ้านเลขที่, เจ้าของ, สถานะรถ</td><td>ใช้ทั้ง search และ OCR matching</td></tr>
+          <tr><td><code>Visitors</code></td><td>เก็บผู้ใช้ที่เคยใช้งานระบบ</td><td>มี row map cache เพื่อให้เขียนเร็วขึ้น</td></tr>
+          <tr><td><code>Log</code></td><td>เก็บ search logs</td><td>ระบบ buffer ก่อนเขียนลงชีต</td></tr>
+          <tr><td><code>SystemLog</code></td><td>เก็บ events ระดับระบบ เช่น health summary, alert, failures</td><td>ถ้ายังไม่มี ระบบสามารถสร้างให้อัตโนมัติพร้อม header</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Script Properties สำคัญ</h3>
+      <div class="pill-row">
+        <span class="pill blue">LINE_ACCESS_TOKEN</span>
+        <span class="pill blue">LINE_CHANNEL_SECRET</span>
+        <span class="pill blue">GEMINI_API_KEY</span>
+        <span class="pill blue">SPREADSHEET_ID</span>
+        <span class="pill blue">ALLOWED_GROUP_IDS</span>
+        <span class="pill blue">ADMIN_UID</span>
+        <span class="pill blue">BACKUP_FOLDER_NAME</span>
+        <span class="pill blue">LOG_RETENTION_DAYS</span>
+        <span class="pill blue">BACKUP_RETENTION_DAYS</span>
+        <span class="pill blue">GITHUB_REPO</span>
+      </div>
+    </section>
+
+    <section class="section" id="ops">
+      <h2>สุขภาพระบบและปัญหาที่พบบ่อย</h2>
+
+      <h3>ระบบ log และ alert ทำงานอย่างไร</h3>
+      <ul>
+        <li><code>Log</code> ใช้เก็บประวัติการค้นหาและจะ buffer ก่อน flush ลงชีต</li>
+        <li><code>SystemLog</code> ใช้เก็บ operational events</li>
+        <li>ระดับ <code>ALERT</code> และ <code>ERROR</code> จะถูก flush ลง <code>SystemLog</code> ทันที</li>
+        <li><code>/testalert</code> ใช้ทดสอบทั้ง LINE alert และ SystemLog โดยไม่ต้องทำระบบจริงให้ fail</li>
+      </ul>
+
+      <h3>กรณีที่พบบ่อย</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>อาการ</th>
+            <th>สิ่งที่ควรเช็ก</th>
+            <th>วิธีแก้เบื้องต้น</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Bot ไม่ตอบ</td><td>Webhook, deployment, Script Properties</td><td>เริ่มจาก <code>/health</code> และเช็ก deployment ล่าสุด</td></tr>
+          <tr><td>OCR อ่านไม่ออก</td><td>ความชัดของภาพ, Gemini API, rate limit</td><td>ลองถ่ายใหม่ หรือใช้ <code>/health full</code> เพื่อตรวจ Gemini</td></tr>
+          <tr><td>ไม่เห็น system event ในชีต</td><td><code>SystemLog</code>, ระดับ log, buffer</td><td>ใช้ <code>/syslog 10</code> หรือ <code>/testalert</code> เพื่อยืนยัน pipeline</td></tr>
+          <tr><td>ข้อมูลในชีตแก้แล้วแต่ผลยังไม่อัปเดต</td><td>cache ของ Staff, Vehicles, Visitors</td><td>รอ cache refresh หรือให้ admin ใช้ <code>/clearcache</code></td></tr>
+          <tr><td>maintenance ทำงานไม่ครบ</td><td>Drive access, backup folder, retention jobs</td><td>ดู LINE admin alert และ <code>SystemLog</code> event <code>maintenance_partial_failure</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="note">แนะนำให้ใช้ชุดคำสั่ง <code>/health</code>, <code>/syslog 10</code> และ <code>/testalert</code> เป็น baseline เวลาตรวจ staging หรือหลัง deploy</div>
+    </section>
+  </main>
+
+  <div class="footer">
+    อัปเดตตาม codebase ปัจจุบันของโปรเจกต์ Vehicle Verification System บน Google Apps Script และ LINE Bot
+  </div>
+</body>
+</html>
