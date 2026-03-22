@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture Flow — Vehicle Verification System</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+</script>
+<style>
+  :root {
+    --bg: #f5f8fc;
+    --panel: #ffffff;
+    --border: #d6e0ee;
+    --text: #162538;
+    --muted: #607189;
+    --blue: #1f61d7;
+    --blue-soft: #eaf2ff;
+    --shadow: 0 18px 48px rgba(22,37,56,0.08);
+    --sans: 'IBM Plex Sans Thai', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background:
+      radial-gradient(circle at top right, rgba(31,97,215,0.10), transparent 24%),
+      linear-gradient(180deg, #eef4fb 0%, #f8fbfd 220px, #f5f8fc 100%);
+    color: var(--text);
+    line-height: 1.72;
+  }
+  .hero {
+    padding: 56px 24px 36px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-inner, .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--blue-soft);
+    color: var(--blue);
+    border: 1px solid #cedeFF;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  h1 {
+    margin: 18px 0 10px;
+    font-size: 38px;
+    line-height: 1.14;
+  }
+  .subtitle {
+    max-width: 760px;
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .hero-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .hero-links a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 14px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+    background: var(--panel);
+    color: var(--blue);
+    border: 1px solid var(--border);
+  }
+  .section {
+    margin: 26px auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+  .section h2 {
+    margin: 0 0 10px;
+    font-size: 24px;
+  }
+  .section p, .section li {
+    color: var(--muted);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+  }
+  .card {
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: #fbfcfe;
+  }
+  .card strong {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+  .diagram {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid var(--border);
+    background: #fff;
+    overflow-x: auto;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--blue-soft);
+    color: var(--blue);
+    border-radius: 6px;
+    padding: 2px 6px;
+    border: 1px solid var(--border);
+  }
+  .footer {
+    max-width: 1080px;
+    margin: 0 auto 36px;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 0 8px;
+  }
+  @media (max-width: 760px) {
+    h1 { font-size: 31px; }
+    .section { padding: 20px 16px; border-radius: 18px; }
+  }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="eyebrow">ARCHITECTURE FLOW <span>HTML companion for Pages</span></div>
+      <h1>ภาพรวมสถาปัตยกรรมและ process flow</h1>
+      <p class="subtitle">หน้า HTML นี้สรุป flow หลักของระบบในรูปแบบที่เปิดผ่าน GitHub Pages ได้ง่ายขึ้น โดยยังคงมี markdown source แยกไว้สำหรับการแก้ไขและ review ใน repo</p>
+      <div class="hero-links">
+        <a href="./index.html">กลับหน้า docs index</a>
+        <a href="./architecture-flow.md">ดู markdown source</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="section">
+      <h2>System Overview</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>Webhook entry</strong>
+          <p><code>doPost(e)</code> รับ event, parse payload และสร้าง <code>requestId</code> สำหรับการ trace</p>
+        </div>
+        <div class="card">
+          <strong>Handlers</strong>
+          <p><code>textHandler</code>, <code>imageHandler</code> และ <code>followHandler</code> แยก flow ตามชนิดของ event</p>
+        </div>
+        <div class="card">
+          <strong>Ops commands</strong>
+          <p><code>/health</code>, <code>/syslog</code>, <code>/testalert</code> ช่วยดูแลระบบจากใน LINE โดยตรง</p>
+        </div>
+        <div class="card">
+          <strong>Logging</strong>
+          <p><code>Log</code> และ <code>SystemLog</code> มี buffering และระดับความสำคัญต่างกัน</p>
+        </div>
+      </div>
+      <div class="diagram">
+        <pre class="mermaid">flowchart TD
+    U["LINE User"] --> LINE["LINE Messaging API"]
+    LINE --> WEBHOOK["GAS Web App doPost(e)"]
+    WEBHOOK --> PARSE["parse request + requestId"]
+    PARSE --> ROUTER["routeLineEvent"]
+
+    ROUTER --> FOLLOW["followHandler"]
+    ROUTER --> TEXT["textHandler"]
+    ROUTER --> IMAGE["imageHandler"]
+
+    TEXT --> STAFF["staffService"]
+    TEXT --> SEARCH["vehicleSearchService"]
+    TEXT --> ADMIN["adminCommandRouter"]
+    TEXT --> VISITOR["visitorService"]
+    TEXT --> LOG["logService"]
+
+    IMAGE --> OCR["ocrService"]
+    IMAGE --> SEARCH
+    IMAGE --> VISITOR
+    IMAGE --> LOG
+
+    ADMIN --> HEALTH["healthCommand"]
+    ADMIN --> SYSLOG["syslogCommand"]
+    ADMIN --> TESTALERT["testAlertCommand"]
+
+    STAFF --> SHEETS["Google Sheets"]
+    SEARCH --> SHEETS
+    VISITOR --> SHEETS
+    LOG --> SHEETS
+    OCR --> GEMINI["Gemini API"]
+    OCR --> LINECONTENT["LINE Content API"]</pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Text Query Flow</h2>
+      <div class="diagram">
+        <pre class="mermaid">flowchart TD
+    A["LINE text message"] --> B["doPost(e)"]
+    B --> C["generate requestId"]
+    C --> D["routeLineEvent"]
+    D --> E["textHandler"]
+    E --> F["getStaff"]
+    F --> G{"staff lookup ok?"}
+
+    G -- "no" --> H["Reply temporary unavailable"]
+    G -- "yes" --> I{"allowed group or admin?"}
+    I -- "no" --> J["Reply deny group access"]
+    I -- "yes" --> K["trackUser"]
+    K --> L{"authorized?"}
+    L -- "no" --> M["Reply unauthorized"]
+    L -- "yes" --> N{"starts with / ?"}
+
+    N -- "yes" --> O["adminCommandRouter"]
+    O --> P["run admin command with requestId"]
+    P --> Q["Reply to LINE"]
+
+    N -- "no" --> R["search by house or plate"]
+    R --> S["writeLog (buffered)"]
+    S --> T["Reply to LINE"]</pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>OCR and Ops Flow</h2>
+      <div class="diagram">
+        <pre class="mermaid">flowchart TD
+    A["LINE image message"] --> B["imageHandler"]
+    B --> C["extractPlateFromImage"]
+    C --> D["Fetch image from LINE Content API"]
+    D --> E["OCR with Gemini API"]
+    E --> F{"plate extracted?"}
+    F -- "no" --> G["Reply OCR busy or image unclear"]
+    F -- "yes" --> H["resolvePlateFromOcr"]
+    H --> I["searchByPlateDetailed"]
+    I --> J["writeLog (buffered)"]
+    J --> K["Reply with OCR result"]
+
+    L["/health"] --> M["Config / Spreadsheet / Cache / Drive checks"]
+    L --> N["Optional LINE + Gemini live checks in full mode"]
+    L --> O["writeSystemLog on warn/fail/slow"]
+
+    P["/testalert"] --> Q["writeSystemLog ALERT"]
+    Q --> R["flushBufferedSystemLogs"]
+    R --> S["sendAdminAlert"]</pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Maintenance and Deployment</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>Maintenance</strong>
+          <p><code>dailyMaintenance()</code> flush logs, สำรองข้อมูล, cleanup และส่ง alert ถ้ามี partial failure</p>
+        </div>
+        <div class="card">
+          <strong>Retention</strong>
+          <p><code>dailyCleanup()</code> ล้างข้อมูลเก่าจาก <code>Log</code>, <code>Visitors</code> และ <code>SystemLog</code></p>
+        </div>
+        <div class="card">
+          <strong>Deployment</strong>
+          <p>push ไป <code>main</code> เพื่อ production และ <code>feature/**</code> เพื่อ staging ผ่าน GitHub Actions + clasp</p>
+        </div>
+      </div>
+      <div class="diagram">
+        <pre class="mermaid">flowchart TD
+    A["Developer pushes to main or feature/**"] --> B["GitHub Actions deploy.yml"]
+    B --> C["Install clasp"]
+    C --> D["Inject src/versionInfo.js"]
+    D --> E["clasp push --force"]
+    E --> F["clasp deploy"]
+    F --> G{"branch = main?"}
+    G -- "yes" --> H["BLUE / Production GAS"]
+    G -- "no" --> I["GREEN / Staging GAS"]</pre>
+      </div>
+    </section>
+  </main>
+
+  <div class="footer">
+    Last updated: 2026-03-22 · ใช้คู่กับ <a href="./technical-guide.html">technical guide</a> และ <a href="./architecture-flow.md">markdown source</a>
+  </div>
+</body>
+</html>

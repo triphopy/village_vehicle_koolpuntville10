@@ -69,16 +69,22 @@ docs/
 5. services จะเชื่อมกับ Google Sheets, CacheService, Google Drive, LINE API และ Gemini API
 6. admin commands จะถูก dispatch ต่อใน `src/commands/adminCommandRouter.js`
 
-รายละเอียด flow แบบเต็มดูได้ที่ [docs/architecture-flow.md](/C:/Users/jonew/Downloads/P_Kwan/village_vehicle_koolpuntville10/docs/architecture-flow.md)
+รายละเอียด flow แบบเต็มดูได้ที่ [docs/architecture-flow.md](./docs/architecture-flow.md)
 
 หน้าเอกสารหลัก:
 
-- [docs/index.html](/C:/Users/jonew/Downloads/P_Kwan/village_vehicle_koolpuntville10/docs/index.html)
+- [docs/index.html](./docs/index.html)
 
 คู่มือที่อัปเดตตาม codebase ปัจจุบัน:
 
-- [docs/user-manual.html](/C:/Users/jonew/Downloads/P_Kwan/village_vehicle_koolpuntville10/docs/user-manual.html)
-- [docs/technical-guide.html](/C:/Users/jonew/Downloads/P_Kwan/village_vehicle_koolpuntville10/docs/technical-guide.html)
+- [docs/user-manual.html](./docs/user-manual.html)
+- [docs/technical-guide.html](./docs/technical-guide.html)
+- [docs/architecture-flow.html](./docs/architecture-flow.html)
+
+GitHub Pages support:
+
+- entry page: [docs/index.html](./docs/index.html)
+- workflow: [.github/workflows/docs-pages.yml](./.github/workflows/docs-pages.yml)
 
 ## Google Sheets ที่ระบบใช้
 
@@ -223,7 +229,7 @@ npm test
 - push ไป `feature/**`
   deploy ไป GREEN / staging
 
-workflow อยู่ที่ [.github/workflows/deploy.yml](/C:/Users/jonew/Downloads/P_Kwan/village_vehicle_koolpuntville10/.github/workflows/deploy.yml)
+workflow อยู่ที่ [.github/workflows/deploy.yml](./.github/workflows/deploy.yml)
 
 ระหว่าง CI จะมีการ:
 

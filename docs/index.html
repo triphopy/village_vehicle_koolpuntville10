@@ -67,6 +67,12 @@
     gap: 10px;
     margin-top: 24px;
   }
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+  }
   .pill {
     display: inline-flex;
     align-items: center;
@@ -154,6 +160,9 @@
   .section p, .section li {
     color: var(--muted);
   }
+  .section a {
+    color: var(--blue);
+  }
   code {
     font-family: var(--mono);
     background: var(--panel-2);
@@ -189,6 +198,10 @@
         <span class="pill">SystemLog</span>
         <span class="pill">Health Checks</span>
       </div>
+      <div class="hero-meta">
+        <span class="pill">Last updated: 2026-03-22</span>
+        <span class="pill">Branch-ready for GitHub Pages</span>
+      </div>
     </div>
   </header>
 
@@ -222,14 +235,15 @@
 
       <section class="card">
         <h2>Architecture Flow</h2>
-        <p>ดูภาพรวม flow ของ webhook, text/image handlers, admin ops, logging, maintenance และ deployment ในรูปแบบ markdown</p>
+        <p>ดูภาพรวม flow ของ webhook, text/image handlers, admin ops, logging, maintenance และ deployment ในรูปแบบ HTML สำหรับเปิดบน GitHub Pages ได้สะดวกขึ้น</p>
         <div class="meta">
           <span>Architecture</span>
           <span>Mermaid</span>
-          <span>Markdown</span>
+          <span>HTML</span>
         </div>
         <div class="actions">
-          <a class="btn btn-primary" href="./architecture-flow.md">เปิดเอกสาร architecture</a>
+          <a class="btn btn-primary" href="./architecture-flow.html">เปิดเอกสาร architecture</a>
+          <a class="btn btn-secondary" href="./architecture-flow.md">ดู markdown source</a>
         </div>
       </section>
     </div>
@@ -239,7 +253,7 @@
       <ul>
         <li>เริ่มจากคู่มือผู้ใช้งาน ถ้าต้องการดูคำสั่งหรือ flow ที่คนหน้างานใช้จริง</li>
         <li>เปิดคู่มือเชิงเทคนิค เมื่อต้องตั้งค่า Script Properties, ตรวจ logging หรือดู maintenance behavior</li>
-        <li>ใช้งานร่วมกับ [README.md](/C:/Users/jonew/Downloads/P_Kwan/village_vehicle_koolpuntville10/README.md) เพื่อดูภาพรวม repo และคำสั่งทดสอบ</li>
+        <li>ใช้งานร่วมกับ <a href="../README.md">README.md</a> เพื่อดูภาพรวม repo และคำสั่งทดสอบ</li>
       </ul>
       <p>ถ้าเปิดผ่าน GitHub Pages ไฟล์นี้สามารถใช้เป็น landing page หลักของเอกสารได้ทันที</p>
     </section>
