@@ -21,6 +21,8 @@ function handleAdminCommand(query, adminId, event) {
         return runVisitorsCommand(context);
       case '/log':
         return runLogCommand(context);
+      case '/health':
+        return runHealthCommand(context);
       case '/clearcache':
         return runClearCacheCommand(context);
       case '/version':

@@ -51,6 +51,8 @@ function handleTextMessage(context) {
              '/whois\n' +
              '/visitors\n' +
              '/log <จำนวน>\n' +
+             '/health\n' +
+             '/health full\n' +
              '/clearcache\n' +
              '/version';
     }
