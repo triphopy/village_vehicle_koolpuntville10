@@ -53,6 +53,7 @@ function handleTextMessage(context) {
              '/log <จำนวน>\n' +
              '/health\n' +
              '/health full\n' +
+             '/testalert\n' +
              '/clearcache\n' +
              '/version';
     }

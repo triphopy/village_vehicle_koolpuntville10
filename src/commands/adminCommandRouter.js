@@ -23,6 +23,8 @@ function handleAdminCommand(query, adminId, event) {
         return runLogCommand(context);
       case '/health':
         return runHealthCommand(context);
+      case '/testalert':
+        return runTestAlertCommand(context);
       case '/clearcache':
         return runClearCacheCommand(context);
       case '/version':
