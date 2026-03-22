@@ -43,7 +43,7 @@ function handleTextMessage(context) {
     let msg = '📋 คำสั่งที่ใช้ได้\n\n👤 ทุกคน\n/myid\n/help';
     if (isAdmin) {
       msg += '\n\n🧑 Admin เท่านั้น\n' +
-             '/add <userId> <ชื่อ> <role>\n' +
+             '/add <userId> <name> <role>\n' +
              '/remove <userId>\n' +
              '/setstatus <userId> <active|inactive>\n' +
              '/setrole <userId> <admin|staff>\n' +
@@ -51,8 +51,8 @@ function handleTextMessage(context) {
              '/status <userId>\n' +
              '/whois\n' +
              '/visitors\n' +
-             '/log <จำนวน>\n' +
-             '/syslog <à¸ˆà¸³à¸™à¸§à¸™>\n' +
+             '/log <count>\n' +
+             '/syslog <count>\n' +
              '/health\n' +
              '/health full\n' +
              '/testalert\n' +

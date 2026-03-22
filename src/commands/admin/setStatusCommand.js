@@ -1,6 +1,6 @@
 function runSetStatusCommand(context) {
   const parts = context.parts;
-  if (parts.length < 3) return '❌ รูปแบบ:\n/setstatus <userId> <active|inactive>';
+  if (parts.length < 3) return '❌ Usage:\n/setstatus <userId> <active|inactive>';
 
   const targetId = parts[1].trim();
   const newStatus = parts[2].trim().toLowerCase();
