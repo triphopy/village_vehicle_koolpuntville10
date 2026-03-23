@@ -20,7 +20,8 @@ const SYSTEM_LOG_HEADERS = [[
 
 function getBufferedLogs() {
   const cached = CacheService.getScriptCache().get(LOG_BUFFER_CACHE_KEY);
-  return cached ? JSON.parse(cached) : [];
+  const entries = cached ? JSON.parse(cached) : [];
+  return rehydrateBufferedLogDates(entries);
 }
 
 function setBufferedLogs(entries) {
@@ -29,7 +30,8 @@ function setBufferedLogs(entries) {
 
 function getBufferedSystemLogs() {
   const cached = CacheService.getScriptCache().get(SYSTEM_LOG_BUFFER_CACHE_KEY);
-  return cached ? JSON.parse(cached) : [];
+  const entries = cached ? JSON.parse(cached) : [];
+  return rehydrateBufferedLogDates(entries);
 }
 
 function setBufferedSystemLogs(entries) {
@@ -150,6 +152,18 @@ function writeSystemLog(level, source, eventName, message, detail, userId, conte
 function truncateSystemLogValue(value, maxLen) {
   const text = value === null || value === undefined ? '' : String(value);
   return text.length > maxLen ? text.substring(0, maxLen) + '...' : text;
+}
+
+function rehydrateBufferedLogDates(entries) {
+  return (entries || []).map(function (entry) {
+    if (!entry || entry.length === 0) return entry;
+
+    const normalized = entry.slice();
+    if (!(normalized[0] instanceof Date) && normalized[0]) {
+      normalized[0] = new Date(normalized[0]);
+    }
+    return normalized;
+  });
 }
 
 function getOrCreateSystemLogSheet() {

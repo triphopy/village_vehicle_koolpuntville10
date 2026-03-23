@@ -42,6 +42,7 @@ function handleImageMessage(context) {
       writeSystemLog('WARN', 'imageHandler', 'ocr_rate_limit', 'OCR is temporarily rate limited', 'LAST_OCR_STATUS=' + LAST_OCR_STATUS, userId, 'groupId=' + (groupId || ''), requestId);
     }
     writeLog(userId, staff.name, lineName, '[OCR] ส่งรูป', isRateLimit ? 'OCR ระบบหนาแน่น' : 'อ่านไม่ได้');
+    flushBufferedLogs();
     replyToLine(
       replyToken,
       isRateLimit
@@ -85,5 +86,6 @@ function handleImageMessage(context) {
     result.logResult || (result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล')
   );
 
+  flushBufferedLogs();
   replyToLine(replyToken, ocrNote + warningNote + result.message);
 }

@@ -103,5 +103,6 @@ function handleTextMessage(context) {
   }
 
   writeLog(userId, staff.name, lineName, query, result.logResult || (result.found ? 'พบข้อมูล' : 'ไม่พบข้อมูล'));
+  flushBufferedLogs();
   replyToLine(replyToken, result.message);
 }
