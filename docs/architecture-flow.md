@@ -1,6 +1,6 @@
 # Architecture and Process Flow
 
-เอกสารนี้สรุป flow การทำงานของระบบตั้งแต่รับ webhook จาก LINE ไปจนถึงค้นหาข้อมูล, OCR, admin commands, health checks, maintenance และ deployment
+เอกสารนี้สรุป flow การทำงานของระบบตั้งแต่รับ webhook จาก LINE ไปจนถึงการค้นหาข้อมูล, OCR, admin commands, health checks, logging, maintenance และ deployment เพื่อใช้เป็นภาพรวมสำหรับการดูแลระบบและรีวิวการเปลี่ยนแปลง
 
 ## 1. System Overview
 
@@ -153,11 +153,13 @@ flowchart TD
     R -- "yes" --> S["Reply OCR busy + writeSystemLog WARN"]
     R -- "no" --> T["Reply image unclear"]
 
-    Q -- "yes" --> U["resolvePlateFromOcr"]
+    Q -- "yes" --> U["resolvePlateFromOcr (post-OCR normalization and hinting)"]
     U --> V["searchByPlateDetailed"]
     V --> W["writeLog (buffered)"]
     W --> X["Reply with OCR result and vehicle status"]
 ```
+
+หมายเหตุ: `resolvePlateFromOcr()` เป็นขั้นตอน post-processing หลัง OCR เพื่อ normalize ข้อความ, สร้าง candidate และช่วยจับคู่กับข้อมูลทะเบียนที่มีอยู่ ไม่ได้ทำหน้าที่เป็น OCR model โดยตรง
 
 ## 5. Admin and Ops Flow
 
@@ -249,7 +251,7 @@ flowchart TD
 - `src/services/vehicleSearchService.js`
   ค้นหาทะเบียนและบ้านเลขที่
 - `src/services/ocrService.js`
-  OCR, normalization, fuzzy matching, candidate generation
+  OCR integration, cleanup, normalization, candidate generation และ OCR-aware matching heuristics
 - `src/services/visitorService.js`
   อัปเดตผู้ใช้ที่เคยใช้งาน พร้อม row map cache
 - `src/services/logService.js`
@@ -281,7 +283,7 @@ flowchart TD
 
 ## 11. Automated Tests
 
-ก่อน deploy หรือก่อน push logic สำคัญ แนะนำให้รัน:
+ก่อน deploy หรือก่อน push logic สำคัญ แนะนำให้รัน local tests ดังนี้
 
 ```bash
 node tests/pure-logic.test.js
@@ -293,7 +295,7 @@ node tests/pure-logic.test.js
 npm test
 ```
 
-ชุด test ปัจจุบันครอบคลุม:
+ชุด test ปัจจุบันครอบคลุมหัวข้อหลักดังนี้
 
 - plate normalization
 - OCR cleanup

@@ -1,10 +1,16 @@
 # LINE/GAS Test Cases
 
-เอกสารนี้ใช้สำหรับทดสอบระบบ Vehicle Verification System หลัง deploy หรือหลังแก้โค้ด โดยครอบคลุมทั้ง flow ปกติ, OCR, admin commands, health checks, alerts และ system logging
+เอกสารนี้ใช้เป็น checklist สำหรับทดสอบระบบ Vehicle Verification System หลัง deploy หรือหลังแก้โค้ด โดยครอบคลุม flow ปกติ, OCR, admin commands, health checks, alerts, maintenance และ system logging
+
+## How to Use This Document
+
+- ใช้ร่วมกับ staging หรือ production ตามขอบเขตที่ต้องการทดสอบ
+- เลือก test case ตามส่วนที่ได้รับผลกระทบจากการแก้โค้ด
+- ถ้ามี incident หรือ regression ให้บันทึกทั้งข้อความตอบกลับของบอท, แถวที่เกี่ยวข้องใน `Log` หรือ `SystemLog` และ commit/version ที่กำลังทดสอบ
 
 ## Test Setup
 
-เตรียมข้อมูลก่อนเริ่มทดสอบ
+เตรียมข้อมูลและ environment ก่อนเริ่มทดสอบ
 
 - มี user ในชีต `Staff` อย่างน้อย 3 แบบ
 - `admin_user` สถานะ `active`, role `admin`
@@ -404,8 +410,8 @@ npm test
 - คาดหวัง:
 - ผลลัพธ์เทียบเท่ากับ `node tests/pure-logic.test.js`
 
-## หมายเหตุ
+## Notes
 
 - ถ้า environment มี PowerShell execution policy ที่บล็อก `npm.ps1` ให้ใช้ `node tests/pure-logic.test.js` แทน
-- การทดสอบ staging ควรทำหลัง deploy branch `feature/**`
+- การทดสอบ staging ควรทำหลัง deploy branch `feature/**` และตรวจสอบ `/version` ให้ตรงกับ commit ที่ต้องการ
 - ถ้าต้อง debug incident ให้ใช้ `/health`, `/syslog`, `SystemLog` และ LINE admin alert ประกอบกัน
