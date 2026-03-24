@@ -286,16 +286,7 @@ function normalizePlateForComparison(text) {
   if (!text) return '';
 
   const compact = compactPlateText(text);
-  const confusionGroups = [
-    ['ฮ', 'อ', 'ฬ'],
-    ['ข', 'ช'],
-    ['บ', '6'],
-    ['0', 'O', 'D', 'Q'],
-    ['1', 'I', 'l'],
-    ['2', 'Z'],
-    ['5', 'S'],
-    ['8', 'B']
-  ];
+  const confusionGroups = getPlateCharacterConfusionGroups();
 
   const map = {};
   confusionGroups.forEach(function (group) {
@@ -319,6 +310,9 @@ function resolvePlateFromOcr(ocrText) {
 
   const generatedMatch = findPlateByGeneratedCandidates(ocrText);
   if (generatedMatch) return generatedMatch;
+
+  const structuralMatch = findPlateByStructureHeuristics(ocrText);
+  if (structuralMatch) return structuralMatch;
 
   return fuzzySearchPlate(ocrText);
 }
@@ -394,28 +388,100 @@ function generatePlateCandidates(text, maxChanges) {
 }
 
 function getPlateConfusionMap() {
-  return {
-    'ฮ': ['ฮ', 'อ', 'ฬ'],
-    'อ': ['อ', 'ฮ', 'ฬ'],
-    'ฬ': ['ฬ', 'ฮ', 'อ'],
-    'ข': ['ข', 'ช'],
-    'ช': ['ช', 'ข'],
-    'บ': ['บ', '6', '8'],
-    '6': ['6', 'บ', '8'],
-    '8': ['8', 'B', 'บ'],
-    '0': ['0', 'O', 'D', 'Q'],
-    'O': ['O', '0', 'D', 'Q'],
-    'D': ['D', '0', 'O', 'Q'],
-    'Q': ['Q', '0', 'O', 'D'],
-    '1': ['1', 'I', 'l'],
-    'I': ['I', '1', 'l'],
-    'l': ['l', '1', 'I'],
-    '2': ['2', 'Z'],
-    'Z': ['Z', '2'],
-    '5': ['5', 'S'],
-    'S': ['S', '5'],
-    'B': ['B', '8', 'บ']
-  };
+  const confusionMap = {};
+  getPlateCharacterConfusionGroups().forEach(function (group) {
+    group.forEach(function (char) {
+      confusionMap[char] = group.slice();
+    });
+  });
+  return confusionMap;
+}
+
+function getPlateCharacterConfusionGroups() {
+  return [
+    ['ฮ', 'อ', 'ฬ'],
+    ['ข', 'ช'],
+    ['ง', 'จ', 'ฉ', 'ม'],
+    ['บ', '6', '8'],
+    ['0', 'O', 'D', 'Q'],
+    ['1', 'I', 'l'],
+    ['2', 'Z'],
+    ['5', 'S'],
+    ['8', 'B']
+  ];
+}
+
+function findPlateByStructureHeuristics(ocrText) {
+  const target = parsePlateComponents(ocrText);
+  if (!target) return null;
+
+  const normalizedLetters = normalizePlateForComparison(target.letters);
+  if (!normalizedLetters || !target.digits) return null;
+
+  const matches = getCachedSheetData('Vehicles')
+    .slice(1)
+    .map(function (row) {
+      const plate = compactPlateText(row[COL_VEHICLE.PLATE]);
+      const parsed = parsePlateComponents(plate);
+      if (!parsed) return null;
+      if (parsed.format !== target.format) return null;
+      if (parsed.prefix !== target.prefix) return null;
+      if (parsed.letters.length !== target.letters.length) return null;
+      if (parsed.digits !== target.digits) return null;
+
+      return {
+        plate: plate,
+        score: stringSimilarity(normalizedLetters, normalizePlateForComparison(parsed.letters))
+      };
+    })
+    .filter(function (item) {
+      return item && item.score >= 0.85;
+    })
+    .sort(function (a, b) {
+      return b.score - a.score;
+    });
+
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0].plate;
+  if (matches[0].score >= matches[1].score + 0.1) return matches[0].plate;
+  return null;
+}
+
+function parsePlateComponents(text) {
+  const compact = compactPlateText(text).toUpperCase();
+  if (!compact) return null;
+
+  let match = compact.match(/^([ก-ฮ]{1,3})(\d{1,4})$/);
+  if (match) {
+    return {
+      format: 'letters_digits',
+      prefix: '',
+      letters: match[1],
+      digits: match[2]
+    };
+  }
+
+  match = compact.match(/^(\d{1,2})([ก-ฮ]{1,2})(\d{4})$/);
+  if (match) {
+    return {
+      format: 'prefix_letters_digits',
+      prefix: match[1],
+      letters: match[2],
+      digits: match[3]
+    };
+  }
+
+  match = compact.match(/^(\d{1,2})-(\d{4})$/);
+  if (match) {
+    return {
+      format: 'dash_digits',
+      prefix: match[1],
+      letters: '',
+      digits: match[2]
+    };
+  }
+
+  return null;
 }
 
 function fuzzySearchPlate(ocrText) {
