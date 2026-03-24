@@ -51,11 +51,11 @@ function handleTextMessage(context) {
              '/status <userId>\n' +
              '/whois\n' +
              '/visitors\n' +
-             '/log <count>  View recent search logs\n' +
-             '/syslog <count>  View entries from the SystemLog sheet\n' +
+             '/log <count>\n' +
+             '/syslog <count>\n' +
              '/health\n' +
              '/health full\n' +
-             '/testalert  Send a test alert and write a SystemLog entry\n' +
+             '/testalert\n' +
              '/clearcache\n' +
              '/version';
     }
