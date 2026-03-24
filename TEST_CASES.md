@@ -12,6 +12,8 @@
 
 เตรียมข้อมูลและ environment ก่อนเริ่มทดสอบ
 
+หมายเหตุ: ตัวอย่างทะเบียนและบ้านเลขที่ในเอกสารนี้เป็นข้อมูลสมมติสำหรับการทดสอบเท่านั้น
+
 - มี user ในชีต `Staff` อย่างน้อย 3 แบบ
 - `admin_user` สถานะ `active`, role `admin`
 - `staff_user` สถานะ `active`, role `staff`
@@ -20,10 +22,10 @@
 
 ```text
 PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
-กข1234      Toyota  Yaris   ขาว    1/23     A       active
-1กข2345     Honda   City    ดำ     1/24     B       inactive
-80-1234     Isuzu   Dmax    เทา    2/10     C       active
-3ขฮ8777     Mazda   2       แดง    3/12     D       active
+ทด1234      Toyota  Yaris   ขาว    10/23    A       active
+1ทด2345     Honda   City    ดำ     10/24    B       inactive
+80-0001     Isuzu   Dmax    เทา    20/10    C       active
+3ทฮ7007     Mazda   2       แดง    30/12    D       active
 ```
 
 - ใน Script Properties มีค่า `ALLOWED_GROUP_IDS`
@@ -92,7 +94,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ส่งในห้องที่ไม่อยู่ใน `ALLOWED_GROUP_IDS`:
 
 ```text
-กข1234
+ทด1234
 ```
 
 - คาดหวัง:
@@ -104,7 +106,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ส่งข้อความ:
 
 ```text
-กข1234
+ทด1234
 ```
 
 - คาดหวัง:
@@ -116,7 +118,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ส่งข้อความ:
 
 ```text
-กข1234
+ทด1234
 ```
 
 - คาดหวัง:
@@ -129,7 +131,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ส่งข้อความ:
 
 ```text
-กก9999
+ทด9999
 ```
 
 - คาดหวัง:
@@ -141,7 +143,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ส่งข้อความ:
 
 ```text
-80-1234
+80-0001
 ```
 
 - คาดหวัง:
@@ -153,7 +155,7 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ส่งข้อความ:
 
 ```text
-1/23
+10/23
 ```
 
 - คาดหวัง:
@@ -188,19 +190,19 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 ### TC-13 OCR อ่านได้และพบทะเบียนตรงตัว
 
 - ผู้ทดสอบ: `staff_user`
-- ส่งรูปป้าย `กข1234`
+- ส่งรูปป้าย `ทด1234`
 - คาดหวัง:
-- แสดง `อ่านจากรูปได้: กข1234`
+- แสดง `อ่านจากรูปได้: ทด1234`
 - แสดงข้อมูลรถตามสถานะ
 - ไม่แสดงรายการใกล้เคียง
 
 ### TC-14 OCR อ่านได้แต่ไม่พบตรงตัว และมีเลขใกล้เคียง
 
 - ผู้ทดสอบ: `staff_user`
-- ในชีตมี `3ขฮ8777`
-- ส่งรูปที่ OCR อ่านออกเป็น `3ขอ8777`
+- ในชีตมี `3ทฮ7007`
+- ส่งรูปที่ OCR อ่านออกเป็น `3ทอ7007`
 - คาดหวัง:
-- แสดง `อ่านจากรูปได้: 3ขอ8777`
+- แสดง `อ่านจากรูปได้: 3ทอ7007`
 - แสดงว่าไม่พบข้อมูลตรงตัวในระบบ
 - แสดงส่วน `ใกล้เคียงที่อาจเป็น`
 - แสดงผลตรวจให้ตรวจป้ายอีกครั้ง
@@ -243,10 +245,10 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ส่งข้อความ:
 
 ```text
-3ขอ8777
+3ทอ7007
 ```
 
-- ในชีตมี `3ขฮ8777`
+- ในชีตมี `3ทฮ7007`
 - คาดหวัง:
 - แสดง `ใกล้เคียงที่อาจเป็น`
 - แสดง `ผลตรวจ: กรุณาตรวจทะเบียนอีกครั้ง`
@@ -257,10 +259,10 @@ PLATE       BRAND   MODEL   COLOR   HOUSE    OWNER   STATUS
 - ส่งข้อความหลายแบบ เช่น:
 
 ```text
-3 ขฮ 8777
-3ขฮ-8777
-80 1234
-80-1234
+3 ทฮ 7007
+3ทฮ-7007
+80 0001
+80-0001
 ```
 
 - คาดหวัง:
