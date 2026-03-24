@@ -40,9 +40,9 @@ function handleTextMessage(context) {
   }
 
   if (query === '/help') {
-    let msg = '📋 คำสั่งที่ใช้ได้\n\n👤 ทุกคน\n/myid\n/help';
+    let msg = '📋 Available commands\n\n👤 Everyone\n/myid\n/help';
     if (isAdmin) {
-      msg += '\n\n🧑 Admin เท่านั้น\n' +
+      msg += '\n\n🧑 Admin only\n' +
              '/add <userId> <name> <role>\n' +
              '/remove <userId>\n' +
              '/setstatus <userId> <active|inactive>\n' +
@@ -51,11 +51,11 @@ function handleTextMessage(context) {
              '/status <userId>\n' +
              '/whois\n' +
              '/visitors\n' +
-             '/log <count>\n' +
-             '/syslog <count>\n' +
+             '/log <count>  View recent search logs\n' +
+             '/syslog <count>  View entries from the SystemLog sheet\n' +
              '/health\n' +
              '/health full\n' +
-             '/testalert\n' +
+             '/testalert  Send a test alert and write a SystemLog entry\n' +
              '/clearcache\n' +
              '/version';
     }
