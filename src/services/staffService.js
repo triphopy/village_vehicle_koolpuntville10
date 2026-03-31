@@ -1,6 +1,7 @@
 const SHEET_CACHE_TTL_SECONDS = 600;
 const SHEET_STALE_CACHE_TTL_SECONDS = 21600;
 const SERVICE_UNAVAILABLE_CODE = 'SERVICE_UNAVAILABLE';
+const VEHICLE_SHEET_REQUIRED_HEADERS = ['license_plate', 'brand', 'model', 'color', 'house_no', 'owner_name', 'status', 'vehicle_type'];
 
 function createServiceUnavailableError(serviceName, operation, cause) {
   const message = serviceName + ' unavailable during ' + operation +
@@ -54,11 +55,38 @@ function cacheSheetData(sheetName, values) {
 
 function readSheetDataOrThrow(sheetName) {
   try {
-    return getSheetOrThrow(sheetName).getDataRange().getValues();
+    const sheet = getSheetOrThrow(sheetName);
+    ensureSheetSchema(sheetName, sheet);
+    return sheet.getDataRange().getValues();
   } catch (err) {
     if (isServiceUnavailableError(err)) throw err;
     throw createServiceUnavailableError('SpreadsheetApp', 'read sheet ' + sheetName, err);
   }
+}
+
+function ensureSheetSchema(sheetName, sheet) {
+  if (sheetName !== 'Vehicles') return;
+  ensureVehicleSheetSchema(sheet);
+}
+
+function ensureVehicleSheetSchema(sheet) {
+  const requiredWidth = VEHICLE_SHEET_REQUIRED_HEADERS.length;
+  const lastColumn = sheet.getLastColumn();
+
+  if (lastColumn < requiredWidth) {
+    sheet.insertColumnsAfter(Math.max(lastColumn, 1), requiredWidth - lastColumn);
+  }
+
+  const currentHeaders = sheet.getRange(1, 1, 1, requiredWidth).getValues()[0].map(function (value) {
+    return ((value || '') + '').trim();
+  });
+  const needsUpdate = VEHICLE_SHEET_REQUIRED_HEADERS.some(function (header, index) {
+    return currentHeaders[index] !== header;
+  });
+
+  if (!needsUpdate) return;
+
+  sheet.getRange(1, 1, 1, requiredWidth).setValues([VEHICLE_SHEET_REQUIRED_HEADERS]);
 }
 
 function getCachedSheetData(sheetName) {

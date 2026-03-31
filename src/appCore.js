@@ -24,7 +24,8 @@ const COL_VEHICLE = {
   COLOR: 3,
   HOUSE: 4,
   OWNER: 5,
-  STATUS: 6
+  STATUS: 6,
+  VEHICLE_TYPE: 7
 };
 
 const COL_STAFF = {
