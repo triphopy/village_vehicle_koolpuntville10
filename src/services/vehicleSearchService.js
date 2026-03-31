@@ -223,10 +223,34 @@ function formatVehicleLine(row) {
   const brand = ((row[COL_VEHICLE.BRAND] || '') + '').trim();
   const model = ((row[COL_VEHICLE.MODEL] || '') + '').trim();
   const color = ((row[COL_VEHICLE.COLOR] || '') + '').trim();
+  const type = getVehicleTypeLabel(row);
+  const details = [];
 
-  if (brand && model) return brand + ' ' + model + ' | สี' + color;
-  if (brand) return brand + ' | สี' + color;
-  return 'สี' + color;
+  if (brand && model) {
+    details.push(brand + ' ' + model);
+  } else if (brand) {
+    details.push(brand);
+  }
+
+  if (color) details.push('สี' + color);
+  if (type) details.push(type);
+
+  return details.length > 0 ? details.join(' | ') : '-';
+
+}
+
+function getVehicleTypeLabel(row) {
+  const rawType = ((row[COL_VEHICLE.VEHICLE_TYPE] || '') + '').trim();
+  const normalizedType = normalizeVehicleType(rawType);
+  return normalizedType ? '\u0e1b\u0e23\u0e30\u0e40\u0e20\u0e17 ' + normalizedType : '';
+}
+
+function normalizeVehicleType(value) {
+  const normalized = ((value || '') + '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (['\u0e23\u0e16\u0e22\u0e19\u0e15\u0e4c', 'car'].indexOf(normalized) !== -1) return '\u0e23\u0e16\u0e22\u0e19\u0e15\u0e4c';
+  if (['\u0e23\u0e16\u0e08\u0e31\u0e01\u0e23\u0e22\u0e32\u0e19\u0e22\u0e19\u0e15\u0e4c', 'motorcycle', 'bike'].indexOf(normalized) !== -1) return '\u0e23\u0e16\u0e08\u0e31\u0e01\u0e23\u0e22\u0e32\u0e19\u0e22\u0e19\u0e15\u0e4c';
+  return ((value || '') + '').trim();
 }
 
 function findSuggestedPlates(query, forcedSuggestions, limit, options) {
@@ -364,3 +388,4 @@ function getDecisionLabel(status) {
   if (s === 'blacklist') return 'ผลตรวจ: ห้ามเข้า';
   return 'ผลตรวจ: กรุณาตรวจสอบข้อมูล';
 }
+

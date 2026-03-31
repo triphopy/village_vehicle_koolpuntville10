@@ -13,10 +13,11 @@ const sandbox = loadGasFiles([
     COLOR: 3,
     HOUSE: 4,
     OWNER: 5,
-    STATUS: 6
+    STATUS: 6,
+    VEHICLE_TYPE: 7
   },
   getCachedSheetData: () => [
-    ['PLATE', 'BRAND', 'MODEL', 'COLOR', 'HOUSE', 'OWNER', 'STATUS'],
+    ['PLATE', 'BRAND', 'MODEL', 'COLOR', 'HOUSE', 'OWNER', 'STATUS', 'VEHICLE_TYPE'],
     ['3ทฮ7007', 'Mazda', '2', 'แดง', '30/12', 'D', 'active'],
     ['งฉ9094', 'Honda', 'City', 'ดำ', '90/99', 'E', 'active'],
     ['ทด1234', 'Toyota', 'Yaris', 'ขาว', '10/23', 'A', 'active'],
@@ -63,4 +64,15 @@ test('stringSimilarity and editDistance behave consistently', () => {
   assert.equal(sandbox.editDistance('plate', 'plate'), 0);
   assert.equal(sandbox.stringSimilarity('ABC123', 'ABC123'), 1);
   assert.ok(sandbox.stringSimilarity('ABC123', 'ABC124') > sandbox.stringSimilarity('ABC123', 'XYZ999'));
+});
+
+test('formatVehicleLine includes type details from the new Vehicles sheet columns', () => {
+  assert.equal(
+    sandbox.formatVehicleLine(['plate', 'Toyota', 'Yaris', 'white', '10/23', 'A', 'active', 'รถยนต์']),
+    'Toyota Yaris | สีwhite | ประเภท รถยนต์'
+  );
+  assert.equal(
+    sandbox.formatVehicleLine(['plate', 'Honda', 'City', 'black', '90/99', 'E', 'active', 'รถจักรยานยนต์']),
+    'Honda City | สีblack | ประเภท รถจักรยานยนต์'
+  );
 });
