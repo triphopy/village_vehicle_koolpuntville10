@@ -76,3 +76,14 @@ test('formatVehicleLine includes type details from the new Vehicles sheet column
     'Honda City | สีblack | ประเภท รถจักรยานยนต์'
   );
 });
+
+test('getVehicleIcon switches to motorcycle icon for motorcycle rows', () => {
+  assert.equal(
+    sandbox.getVehicleIcon(['plate', 'Honda', 'City', 'black', '90/99', 'E', 'active', 'motorcycle']),
+    '🏍️'
+  );
+  assert.equal(
+    sandbox.getVehicleIcon(['plate', 'Toyota', 'Yaris', 'white', '10/23', 'A', 'active', 'car']),
+    '🚗'
+  );
+});

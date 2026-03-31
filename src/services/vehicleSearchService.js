@@ -159,7 +159,7 @@ function searchByHouseDetailed(query) {
   }
 
   const msg = matches.map(function (row) {
-    return '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
+    return getVehicleIcon(row) + ' ' + row[COL_VEHICLE.PLATE] + '\n' +
       formatVehicleLine(row) + '\n' +
       getStatusLabel(row[COL_VEHICLE.STATUS]);
   }).join('\n\n');
@@ -173,7 +173,7 @@ function searchByHouseDetailed(query) {
 
 function buildPlateMatchMessage(matches) {
   const msg = matches.map(function (row) {
-    return '🚗 ' + row[COL_VEHICLE.PLATE] + '\n' +
+    return getVehicleIcon(row) + ' ' + row[COL_VEHICLE.PLATE] + '\n' +
       formatVehicleLine(row) + '\n' +
       '🏠 บ้านเลขที่: ' + row[COL_VEHICLE.HOUSE] + '\n' +
       getStatusLabel(row[COL_VEHICLE.STATUS]) + '\n' +
@@ -251,6 +251,11 @@ function normalizeVehicleType(value) {
   if (['\u0e23\u0e16\u0e22\u0e19\u0e15\u0e4c', 'car'].indexOf(normalized) !== -1) return '\u0e23\u0e16\u0e22\u0e19\u0e15\u0e4c';
   if (['\u0e23\u0e16\u0e08\u0e31\u0e01\u0e23\u0e22\u0e32\u0e19\u0e22\u0e19\u0e15\u0e4c', 'motorcycle', 'bike'].indexOf(normalized) !== -1) return '\u0e23\u0e16\u0e08\u0e31\u0e01\u0e23\u0e22\u0e32\u0e19\u0e22\u0e19\u0e15\u0e4c';
   return ((value || '') + '').trim();
+}
+
+function getVehicleIcon(row) {
+  const normalizedType = normalizeVehicleType(row[COL_VEHICLE.VEHICLE_TYPE]);
+  return normalizedType === '\u0e23\u0e16\u0e08\u0e31\u0e01\u0e23\u0e22\u0e32\u0e19\u0e22\u0e19\u0e15\u0e4c' ? '🏍️' : '🚗';
 }
 
 function findSuggestedPlates(query, forcedSuggestions, limit, options) {
