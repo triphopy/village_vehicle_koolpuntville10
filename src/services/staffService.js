@@ -1,7 +1,7 @@
 const SHEET_CACHE_TTL_SECONDS = 600;
 const SHEET_STALE_CACHE_TTL_SECONDS = 21600;
 const SERVICE_UNAVAILABLE_CODE = 'SERVICE_UNAVAILABLE';
-const VEHICLE_SHEET_REQUIRED_HEADERS = ['PLATE', 'BRAND', 'MODEL', 'COLOR', 'HOUSE', 'OWNER', 'STATUS', 'VEHICLE_TYPE'];
+const VEHICLE_SHEET_REQUIRED_HEADERS = ['license_plate', 'brand', 'model', 'color', 'house_no', 'owner_name', 'status', 'vehicle_type'];
 
 function createServiceUnavailableError(serviceName, operation, cause) {
   const message = serviceName + ' unavailable during ' + operation +
@@ -70,18 +70,23 @@ function ensureSheetSchema(sheetName, sheet) {
 }
 
 function ensureVehicleSheetSchema(sheet) {
-  const lastColumn = Math.max(sheet.getLastColumn(), 1);
-  const currentHeaders = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) {
+  const requiredWidth = VEHICLE_SHEET_REQUIRED_HEADERS.length;
+  const lastColumn = sheet.getLastColumn();
+
+  if (lastColumn < requiredWidth) {
+    sheet.insertColumnsAfter(Math.max(lastColumn, 1), requiredWidth - lastColumn);
+  }
+
+  const currentHeaders = sheet.getRange(1, 1, 1, requiredWidth).getValues()[0].map(function (value) {
     return ((value || '') + '').trim();
   });
-  const missingHeaders = VEHICLE_SHEET_REQUIRED_HEADERS.filter(function (header) {
-    return currentHeaders.indexOf(header) === -1;
+  const needsUpdate = VEHICLE_SHEET_REQUIRED_HEADERS.some(function (header, index) {
+    return currentHeaders[index] !== header;
   });
 
-  if (missingHeaders.length === 0) return;
+  if (!needsUpdate) return;
 
-  sheet.insertColumnsAfter(lastColumn, missingHeaders.length);
-  sheet.getRange(1, 1, 1, lastColumn + missingHeaders.length).setValues([currentHeaders.concat(missingHeaders)]);
+  sheet.getRange(1, 1, 1, requiredWidth).setValues([VEHICLE_SHEET_REQUIRED_HEADERS]);
 }
 
 function getCachedSheetData(sheetName) {

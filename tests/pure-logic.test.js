@@ -17,7 +17,7 @@ const sandbox = loadGasFiles([
     VEHICLE_TYPE: 7
   },
   getCachedSheetData: () => [
-    ['PLATE', 'BRAND', 'MODEL', 'COLOR', 'HOUSE', 'OWNER', 'STATUS', 'VEHICLE_TYPE'],
+    ['license_plate', 'brand', 'model', 'color', 'house_no', 'owner_name', 'status', 'vehicle_type'],
     ['3ทฮ7007', 'Mazda', '2', 'แดง', '30/12', 'D', 'active'],
     ['งฉ9094', 'Honda', 'City', 'ดำ', '90/99', 'E', 'active'],
     ['ทด1234', 'Toyota', 'Yaris', 'ขาว', '10/23', 'A', 'active'],
