@@ -417,3 +417,11 @@ npm test
 - ถ้า environment มี PowerShell execution policy ที่บล็อก `npm.ps1` ให้ใช้ `node tests/pure-logic.test.js` แทน
 - การทดสอบ staging ควรทำหลัง deploy branch `feature/**` และตรวจสอบ `/version` ให้ตรงกับ commit ที่ต้องการ
 - ถ้าต้อง debug incident ให้ใช้ `/health`, `/syslog`, `SystemLog` และ LINE admin alert ประกอบกัน
+
+## Vehicle Type Addendum
+
+- `Vehicles` should now use the lowercase header schema `license_plate`, `brand`, `model`, `color`, `house_no`, `owner_name`, `status`, `vehicle_type`
+- `vehicle_type` should use English values: `car` or `motorcycle`
+- Search and OCR reply messages should show the car icon for `car` rows and the motorcycle icon for `motorcycle` rows
+- Local automated coverage now includes `vehicle_type` formatting and icon selection in `tests/pure-logic.test.js`
+

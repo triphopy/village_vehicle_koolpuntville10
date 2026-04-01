@@ -85,6 +85,16 @@ docs/
 
 ## Data Model
 
+### Vehicles Schema
+
+```text
+license_plate | brand | model | color | house_no | owner_name | status | vehicle_type
+```
+
+- `vehicle_type` recommended values are `car` and `motorcycle`
+- runtime normalizes the first 8 `Vehicles` headers to this schema before reading sheet data
+- search replies use `🏍️` for `motorcycle` rows and `🚗` for other vehicle rows
+
 ระบบใช้งาน Google Sheets หลักดังนี้
 
 - `Staff`: ชื่อผู้ใช้, LINE UID, สถานะ และ role
@@ -211,6 +221,7 @@ npm test
 - OCR result resolution
 - fuzzy matching
 - similarity and edit distance logic
+- `vehicle_type` formatting and icon selection for replies
 
 ## Deployment
 

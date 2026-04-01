@@ -61,6 +61,10 @@
 ## Sheets and logging
 
 - Primary sheets used by the app are `Staff`, `Vehicles`, `Visitors`, `Log`, and `SystemLog`.
+- `Vehicles` uses the lowercase schema `license_plate`, `brand`, `model`, `color`, `house_no`, `owner_name`, `status`, and `vehicle_type`.
+- `src/services/staffService.js` normalizes the first 8 `Vehicles` headers to that schema before reading sheet data.
+- `vehicle_type` should use English values such as `car` and `motorcycle`.
+- `src/services/vehicleSearchService.js` formats replies using `vehicle_type`; motorcycle rows render with `🏍️` and other vehicle rows render with `🚗`.
 - `SystemLog` is auto-created by the runtime when needed and stores operational events with request tracing.
 - `src/services/logService.js` buffers `Log` writes and `SystemLog` writes to reduce sheet write frequency.
 - `ALERT` and `ERROR` system log levels flush immediately; `WARN` and `INFO` can remain buffered until threshold or explicit flush.

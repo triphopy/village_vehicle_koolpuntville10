@@ -303,3 +303,14 @@ npm test
 - OCR result resolution
 - edit distance
 - string similarity
+
+## 12. Vehicles Sheet Schema
+
+```text
+license_plate | brand | model | color | house_no | owner_name | status | vehicle_type
+```
+
+- `vehicle_type` should use English values: `car` or `motorcycle`
+- Runtime normalizes the first 8 `Vehicles` headers to this schema before reading sheet data
+- Search and OCR reply messages use the car icon for `car` rows and the motorcycle icon for `motorcycle` rows
+
