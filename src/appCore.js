@@ -110,7 +110,7 @@ function onEdit(e) {
   }
 
   if (sheetName === 'Vehicles') {
-    cache.remove('vehicles');
+    clearSheetCache('Vehicles');
     console.log('Auto-cleared vehicle cache due to manual edit');
   }
 

@@ -53,6 +53,12 @@ function cacheSheetData(sheetName, values) {
   cache.put(getStaleSheetCacheKey(sheetName), payload, SHEET_STALE_CACHE_TTL_SECONDS);
 }
 
+function clearSheetCache(sheetName) {
+  const cache = CacheService.getScriptCache();
+  cache.remove(getSheetCacheKey(sheetName));
+  cache.remove(getStaleSheetCacheKey(sheetName));
+}
+
 function readSheetDataOrThrow(sheetName) {
   try {
     const sheet = getSheetOrThrow(sheetName);
