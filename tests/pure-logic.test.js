@@ -19,6 +19,7 @@ const sandbox = loadGasFiles([
   getCachedSheetData: () => [
     ['license_plate', 'brand', 'model', 'color', 'house_no', 'owner_name', 'status', 'vehicle_type'],
     ['3ทฮ7007', 'Mazda', '2', 'แดง', '30/12', 'D', 'active'],
+    ['2กว6', 'Honda', 'Wave', 'ดำ', '40/10', 'F', 'active', 'รถจักรยานยนต์'],
     ['งฉ9094', 'Honda', 'City', 'ดำ', '90/99', 'E', 'active'],
     ['ทด1234', 'Toyota', 'Yaris', 'ขาว', '10/23', 'A', 'active'],
     ['80-0001', 'Isuzu', 'Dmax', 'เทา', '20/10', 'C', 'active']
@@ -28,17 +29,21 @@ const sandbox = loadGasFiles([
 test('cleanPlateText normalizes compact and spaced plate inputs', () => {
   assert.equal(sandbox.cleanPlateText('ทด 1234'), 'ทด1234');
   assert.equal(sandbox.cleanPlateText('3 ทฮ 7007'), '3ทฮ7007');
+  assert.equal(sandbox.cleanPlateText('2 กว 6'), '2กว6');
   assert.equal(sandbox.cleanPlateText('80-0001'), '80-0001');
 });
 
 test('normalizePlateSearchText removes spaces and dashes', () => {
   assert.equal(sandbox.normalizePlateSearchText(' ทด-1234 '), 'ทด1234');
+  assert.equal(sandbox.normalizePlateSearchText(' 2กว-6 '), '2กว6');
   assert.equal(sandbox.normalizePlateSearchText('80 0001'), '800001');
 });
 
 test('plate query classifiers distinguish full, partial, and tail-number searches', () => {
   assert.equal(sandbox.isValidPlateSearchQuery('1234'), true);
   assert.equal(sandbox.isTailNumberSearchQuery('1234'), true);
+  assert.equal(sandbox.isValidPlateSearchQuery('2กว6'), true);
+  assert.equal(sandbox.looksLikeFullPlateQuery('2กว6'), true);
   assert.equal(sandbox.isValidPlateSearchQuery('ab'), false);
 });
 
@@ -52,8 +57,15 @@ test('generatePlateCandidates includes expected OCR confusion substitutions', ()
 
 test('resolvePlateFromOcr returns an exact or fuzzy match from cached vehicle data', () => {
   assert.equal(sandbox.resolvePlateFromOcr('3ทฮ7007'), '3ทฮ7007');
+  assert.equal(sandbox.resolvePlateFromOcr('2กว6'), '2กว6');
   assert.equal(sandbox.resolvePlateFromOcr('3ทอ7007'), '3ทฮ7007');
   assert.equal(sandbox.resolvePlateFromOcr('งง9094'), 'งฉ9094');
+});
+
+test('searchByPlateDetailed finds motorcycle plates with short suffix digits', () => {
+  const result = sandbox.searchByPlateDetailed('2กว6');
+  assert.equal(result.found, true);
+  assert.match(result.message, /2กว6/);
 });
 
 test('findPlateByStructureHeuristics prefers a same-suffix plate when Thai letters are commonly confused', () => {
