@@ -10,6 +10,8 @@ const props = PropertiesService.getScriptProperties();
 const LINE_ACCESS_TOKEN = props.getProperty('LINE_ACCESS_TOKEN');
 const LINE_CHANNEL_SECRET = props.getProperty('LINE_CHANNEL_SECRET');
 const GEMINI_API_KEY = props.getProperty('GEMINI_API_KEY');
+const VISION_API_KEY = props.getProperty('VISION_API_KEY');
+const OCR_PROVIDER = (props.getProperty('OCR_PROVIDER') || 'gemini').toLowerCase();
 const RETENTION_DAYS = Number(props.getProperty('LOG_RETENTION_DAYS')) || 30;
 const BACKUPRETENTION_DAYS = Number(props.getProperty('BACKUP_RETENTION_DAYS')) || 30;
 
@@ -108,7 +110,7 @@ function onEdit(e) {
   }
 
   if (sheetName === 'Vehicles') {
-    cache.remove('vehicles');
+    clearSheetCache('Vehicles');
     console.log('Auto-cleared vehicle cache due to manual edit');
   }
 

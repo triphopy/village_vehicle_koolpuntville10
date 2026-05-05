@@ -2,7 +2,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadGasFiles } = require('./helpers/load-gas-file');
 
+const cacheRemovals = [];
+const cacheStub = {
+  remove: (key) => cacheRemovals.push(key),
+  removeAll: (keys) => cacheRemovals.push(...keys),
+  get: () => null,
+  put: () => {}
+};
+
 const sandbox = loadGasFiles([
+  'src/services/staffService.js',
   'src/services/ocrService.js',
   'src/services/vehicleSearchService.js'
 ], {
@@ -16,6 +25,15 @@ const sandbox = loadGasFiles([
     STATUS: 6,
     VEHICLE_TYPE: 7
   },
+  OCR_PROVIDER: 'gemini',
+  GEMINI_API_KEY: 'gemini-test-key',
+  VISION_API_KEY: 'vision-test-key',
+  CacheService: {
+    getScriptCache: () => cacheStub
+  },
+  Utilities: {
+    base64Encode: () => 'ZmFrZQ=='
+  },
   getCachedSheetData: () => [
     ['license_plate', 'brand', 'model', 'color', 'house_no', 'owner_name', 'status', 'vehicle_type'],
     ['3ทฮ7007', 'Mazda', '2', 'แดง', '30/12', 'D', 'active'],
@@ -25,6 +43,15 @@ const sandbox = loadGasFiles([
     ['80-0001', 'Isuzu', 'Dmax', 'เทา', '20/10', 'C', 'active']
   ]
 });
+
+sandbox.getCachedSheetData = () => [
+  ['license_plate', 'brand', 'model', 'color', 'house_no', 'owner_name', 'status', 'vehicle_type'],
+  ['3ทฮ7007', 'Mazda', '2', 'แดง', '30/12', 'D', 'active'],
+  ['2กว6', 'Honda', 'Wave', 'ดำ', '40/10', 'F', 'active', 'รถจักรยานยนต์'],
+  ['งฉ9094', 'Honda', 'City', 'ดำ', '90/99', 'E', 'active'],
+  ['ทด1234', 'Toyota', 'Yaris', 'ขาว', '10/23', 'A', 'active'],
+  ['80-0001', 'Isuzu', 'Dmax', 'เทา', '20/10', 'C', 'active']
+];
 
 test('cleanPlateText normalizes compact and spaced plate inputs', () => {
   assert.equal(sandbox.cleanPlateText('ทด 1234'), 'ทด1234');
@@ -60,6 +87,47 @@ test('resolvePlateFromOcr returns an exact or fuzzy match from cached vehicle da
   assert.equal(sandbox.resolvePlateFromOcr('2กว6'), '2กว6');
   assert.equal(sandbox.resolvePlateFromOcr('3ทอ7007'), '3ทฮ7007');
   assert.equal(sandbox.resolvePlateFromOcr('งง9094'), 'งฉ9094');
+});
+
+test('getOcrProvider defaults to gemini and accepts vision when configured', () => {
+  sandbox.OCR_PROVIDER = 'unexpected';
+  assert.equal(sandbox.getOcrProvider(), 'gemini');
+
+  sandbox.OCR_PROVIDER = 'vision';
+  assert.equal(sandbox.getOcrProvider(), 'vision');
+
+  sandbox.OCR_PROVIDER = 'gemini';
+});
+
+test('requestPlateOcr routes to the selected provider', () => {
+  const imageBlob = {
+    getBytes: () => [1, 2, 3],
+    getContentType: () => 'image/jpeg'
+  };
+
+  sandbox.OCR_PROVIDER = 'vision';
+  sandbox.fetchWithRetry = () => ({
+    getResponseCode: () => 200,
+    getContentText: () => JSON.stringify({
+      responses: [{ fullTextAnnotation: { text: '2กว6' } }]
+    })
+  });
+  assert.equal(sandbox.requestPlateOcr(imageBlob, 'prompt', undefined, []), '2กว6');
+
+  sandbox.OCR_PROVIDER = 'gemini';
+  sandbox.fetchWithRetry = () => ({
+    getResponseCode: () => 200,
+    getContentText: () => JSON.stringify({
+      candidates: [{ content: { parts: [{ text: 'ทด1234' }] } }]
+    })
+  });
+  assert.equal(sandbox.requestPlateOcr(imageBlob, 'prompt', undefined, []), 'ทด1234');
+});
+
+test('clearSheetCache removes both hot and stale sheet cache keys', () => {
+  cacheRemovals.length = 0;
+  sandbox.clearSheetCache('Vehicles');
+  assert.deepEqual(cacheRemovals, ['sheet_vehicles', 'sheet_vehicles_stale']);
 });
 
 test('searchByPlateDetailed finds motorcycle plates with short suffix digits', () => {

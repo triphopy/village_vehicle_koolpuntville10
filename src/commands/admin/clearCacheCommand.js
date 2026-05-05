@@ -1,7 +1,9 @@
 function runClearCacheCommand() {
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName('Staff');
   const values = sheet.getDataRange().getValues();
-  const keys = ['vehicles'];
+  const keys = [];
+
+  clearSheetCache('Vehicles');
 
   for (let i = 1; i < values.length; i++) {
     if (values[i][COL_STAFF.UID]) {
@@ -14,5 +16,5 @@ function runClearCacheCommand() {
   }
 
   CacheService.getScriptCache().removeAll(keys);
-  return '✅ ล้าง Cache สำเร็จ ' + keys.length + ' รายการ';
+  return '✅ ล้าง Cache สำเร็จ ' + (keys.length + 2) + ' รายการ';
 }
