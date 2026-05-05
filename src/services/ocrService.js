@@ -215,7 +215,7 @@ function requestPlateOcr(imageBlob, promptText, maxOutputTokens, steps) {
 function buildOcrPrompt() {
   return 'อ่านเลขทะเบียนรถจากภาพนี้\n' +
     'ตอบเฉพาะเลขทะเบียนที่เห็น โดยไม่ต้องใส่ช่องว่าง\n' +
-    'รูปแบบอาจเป็นเช่น ทด1234, งล441, 3ทฮ7007, 1ทด2345 หรือ 80-0001\n' +
+    'รูปแบบอาจเป็นเช่น ทด1234, งล441, 3ทฮ7007, 2กว6, 1ทด2345 หรือ 80-0001\n' +
     'ถ้ามีหลายป้าย ให้ตอบป้ายที่ชัดที่สุดเพียงป้ายเดียว\n' +
     'ถ้าไม่มีป้ายหรือมองไม่ออกจริงๆ ให้ตอบ null';
 }
@@ -244,19 +244,19 @@ function cleanPlateText(rawText) {
 
   const patterns = [
     /^[ก-ฮ]{1,3}\d{1,4}$/,
-    /^\d{1,2}[ก-ฮ]{1,2}\d{4}$/,
+    /^\d{1,2}[ก-ฮ]{1,2}\d{1,4}$/,
     /^\d{1,2}\d{4}$/
   ];
 
   if (/^\d{1,2}-\d{4}$/.test(original)) return original;
   if (patterns.some(function (pattern) { return pattern.test(cleanedUpper); })) return cleanedUpper;
 
-  const extracted = cleanedUpper.match(/[ก-ฮ]{1,3}\d{1,4}|\d{1,2}[ก-ฮ]{1,2}\d{4}|\d{1,2}\d{4}/);
+  const extracted = cleanedUpper.match(/[ก-ฮ]{1,3}\d{1,4}|\d{1,2}[ก-ฮ]{1,2}\d{1,4}|\d{1,2}\d{4}/);
   if (extracted) return extracted[0];
 
   const spacedPatterns = [
     /([ก-ฮ]{1,3})\s*(\d{1,4})/,
-    /(\d{1,2})\s*([ก-ฮ]{1,2})\s*(\d{4})/,
+    /(\d{1,2})\s*([ก-ฮ]{1,2})\s*(\d{1,4})/,
     /(\d{1,2})\s*-\s*(\d{4})/
   ];
 
@@ -461,7 +461,7 @@ function parsePlateComponents(text) {
     };
   }
 
-  match = compact.match(/^(\d{1,2})([ก-ฮ]{1,2})(\d{4})$/);
+  match = compact.match(/^(\d{1,2})([ก-ฮ]{1,2})(\d{1,4})$/);
   if (match) {
     return {
       format: 'prefix_letters_digits',

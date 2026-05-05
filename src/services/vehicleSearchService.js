@@ -341,7 +341,7 @@ function isValidPlateSearchQuery(query) {
   if (!looksLikePlateQuery(normalized)) return false;
   if (/^\d{3,4}$/.test(normalized)) return true;
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
-  if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
+  if (/^\d{1,2}[ก-ฮ]{1,2}\d{1,4}$/.test(normalized)) return true;
   if (isPartialPlateQuery(query)) return true;
   return false;
 }
@@ -350,7 +350,7 @@ function looksLikeFullPlateQuery(query) {
   const normalized = normalizePlateSearchText(query).toUpperCase();
   if (!normalized) return false;
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
-  if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
+  if (/^\d{1,2}[ก-ฮ]{1,2}\d{1,4}$/.test(normalized)) return true;
   return false;
 }
 
@@ -359,8 +359,8 @@ function isPartialPlateQuery(query) {
   if (!normalized) return false;
   if (/^\d{3,4}$/.test(normalized)) return false;
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return false;
-  if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return false;
-  return /^(?:[ก-ฮ]{2,3}\d{2,4}|\d{1,2}[ก-ฮ]{2}\d{2,3}|[ก-ฮ]{1}\d{2,4})$/.test(normalized);
+  if (/^\d{1,2}[ก-ฮ]{1,2}\d{1,4}$/.test(normalized)) return false;
+  return /^(?:[ก-ฮ]{2,3}\d{2,4}|\d{1,2}[ก-ฮ]{1,2}\d{1,3}|[ก-ฮ]{1}\d{2,4})$/.test(normalized);
 }
 
 function isTailNumberSearchQuery(query) {
@@ -372,8 +372,8 @@ function looksLikePlateQuery(normalized) {
   if (!normalized) return false;
   if (/^\d{3,4}$/.test(normalized)) return true;
   if (/^[ก-ฮ]{1,3}\d{1,4}$/.test(normalized)) return true;
-  if (/^\d{1,2}[ก-ฮ]{1,2}\d{4}$/.test(normalized)) return true;
-  if (/^(?:[ก-ฮ]{2,3}\d{2,4}|\d{1,2}[ก-ฮ]{2}\d{2,3}|[ก-ฮ]{1}\d{2,4})$/.test(normalized)) return true;
+  if (/^\d{1,2}[ก-ฮ]{1,2}\d{1,4}$/.test(normalized)) return true;
+  if (/^(?:[ก-ฮ]{2,3}\d{2,4}|\d{1,2}[ก-ฮ]{1,2}\d{1,3}|[ก-ฮ]{1}\d{2,4})$/.test(normalized)) return true;
 
   return false;
 }
