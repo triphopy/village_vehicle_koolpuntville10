@@ -11,7 +11,8 @@ function runHealthCommand(context) {
     timedHealthCheck('Cache', function () { return checkCacheHealth(); }),
     timedHealthCheck('Drive', function () { return checkDriveHealth(); }),
     timedHealthCheck('LINE API', function () { return checkLineHealth(context.adminId, isFullCheck); }),
-    timedHealthCheck('Gemini API', function () { return checkGeminiHealth(isFullCheck); })
+    timedHealthCheck('Gemini API', function () { return checkGeminiHealth(isFullCheck); }),
+    timedHealthCheck('Vision OCR API', function () { return checkVisionHealth(isFullCheck); })
   ];
   const totalDurationMs = checks.reduce(function (sum, item) {
     return sum + (item.durationMs || 0);
@@ -72,7 +73,6 @@ function checkRequiredProperties() {
   const requiredKeys = [
     'LINE_ACCESS_TOKEN',
     'LINE_CHANNEL_SECRET',
-    'GEMINI_API_KEY',
     'SPREADSHEET_ID',
     'ALLOWED_GROUP_IDS'
   ];
@@ -176,7 +176,9 @@ function checkLineHealth(adminId, isFullCheck) {
 
 function checkGeminiHealth(isFullCheck) {
   if (!GEMINI_API_KEY) {
-    return buildHealthResult('fail', 'Gemini API', 'GEMINI_API_KEY is missing');
+    return getOcrProvider() === 'gemini'
+      ? buildHealthResult('fail', 'Gemini API', 'GEMINI_API_KEY is missing while OCR_PROVIDER=gemini')
+      : buildHealthResult('ok', 'Gemini API', 'not configured (inactive provider)');
   }
 
   if (!isFullCheck) {
@@ -230,6 +232,57 @@ function checkGeminiHealth(isFullCheck) {
     return buildHealthResult('ok', 'Gemini API', 'text generation succeeded');
   } catch (err) {
     return buildHealthResult('fail', 'Gemini API', err.message);
+  }
+}
+
+function checkVisionHealth(isFullCheck) {
+  if (!VISION_API_KEY) {
+    return getOcrProvider() === 'vision'
+      ? buildHealthResult('fail', 'Vision OCR API', 'VISION_API_KEY is missing while OCR_PROVIDER=vision')
+      : buildHealthResult('ok', 'Vision OCR API', 'not configured (inactive provider)');
+  }
+
+  if (!isFullCheck) {
+    return buildHealthResult('ok', 'Vision OCR API', 'API key is configured (skip live check in default mode)');
+  }
+
+  try {
+    const transparentPixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK9sAAAAASUVORK5CYII=';
+    const response = fetchWithRetry(
+      'https://vision.googleapis.com/v1/images:annotate?key=' + VISION_API_KEY,
+      {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify({
+          requests: [{
+            image: { content: transparentPixel },
+            features: [{ type: 'TEXT_DETECTION', maxResults: 1 }]
+          }]
+        })
+      },
+      {
+        serviceName: 'Vision OCR API',
+        operation: 'health check',
+        retries: 1
+      }
+    );
+
+    if (response.getResponseCode() === 429) {
+      return buildHealthResult('warn', 'Vision OCR API', 'rate limited');
+    }
+
+    if (response.getResponseCode() !== 200) {
+      return buildHealthResult('fail', 'Vision OCR API', 'status=' + response.getResponseCode());
+    }
+
+    const payload = JSON.parse(response.getContentText());
+    if (payload && payload.error) {
+      return buildHealthResult('fail', 'Vision OCR API', payload.error.message || 'api error');
+    }
+
+    return buildHealthResult('ok', 'Vision OCR API', 'annotation request succeeded');
+  } catch (err) {
+    return buildHealthResult('fail', 'Vision OCR API', err.message);
   }
 }
 

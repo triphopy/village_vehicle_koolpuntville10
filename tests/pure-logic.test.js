@@ -16,6 +16,12 @@ const sandbox = loadGasFiles([
     STATUS: 6,
     VEHICLE_TYPE: 7
   },
+  OCR_PROVIDER: 'gemini',
+  GEMINI_API_KEY: 'gemini-test-key',
+  VISION_API_KEY: 'vision-test-key',
+  Utilities: {
+    base64Encode: () => 'ZmFrZQ=='
+  },
   getCachedSheetData: () => [
     ['license_plate', 'brand', 'model', 'color', 'house_no', 'owner_name', 'status', 'vehicle_type'],
     ['3ทฮ7007', 'Mazda', '2', 'แดง', '30/12', 'D', 'active'],
@@ -60,6 +66,41 @@ test('resolvePlateFromOcr returns an exact or fuzzy match from cached vehicle da
   assert.equal(sandbox.resolvePlateFromOcr('2กว6'), '2กว6');
   assert.equal(sandbox.resolvePlateFromOcr('3ทอ7007'), '3ทฮ7007');
   assert.equal(sandbox.resolvePlateFromOcr('งง9094'), 'งฉ9094');
+});
+
+test('getOcrProvider defaults to gemini and accepts vision when configured', () => {
+  sandbox.OCR_PROVIDER = 'unexpected';
+  assert.equal(sandbox.getOcrProvider(), 'gemini');
+
+  sandbox.OCR_PROVIDER = 'vision';
+  assert.equal(sandbox.getOcrProvider(), 'vision');
+
+  sandbox.OCR_PROVIDER = 'gemini';
+});
+
+test('requestPlateOcr routes to the selected provider', () => {
+  const imageBlob = {
+    getBytes: () => [1, 2, 3],
+    getContentType: () => 'image/jpeg'
+  };
+
+  sandbox.OCR_PROVIDER = 'vision';
+  sandbox.fetchWithRetry = () => ({
+    getResponseCode: () => 200,
+    getContentText: () => JSON.stringify({
+      responses: [{ fullTextAnnotation: { text: '2กว6' } }]
+    })
+  });
+  assert.equal(sandbox.requestPlateOcr(imageBlob, 'prompt', undefined, []), '2กว6');
+
+  sandbox.OCR_PROVIDER = 'gemini';
+  sandbox.fetchWithRetry = () => ({
+    getResponseCode: () => 200,
+    getContentText: () => JSON.stringify({
+      candidates: [{ content: { parts: [{ text: 'ทด1234' }] } }]
+    })
+  });
+  assert.equal(sandbox.requestPlateOcr(imageBlob, 'prompt', undefined, []), 'ทด1234');
 });
 
 test('searchByPlateDetailed finds motorcycle plates with short suffix digits', () => {

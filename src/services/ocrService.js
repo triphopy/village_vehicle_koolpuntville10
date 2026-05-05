@@ -1,5 +1,5 @@
 /**
- * Accepts an image ID from LINE, fetches the image, sends it to Gemini 2.5 Flash-Lite,
+ * Accepts an image ID from LINE, fetches the image, sends it to the configured OCR provider,
  * and returns the detected plate text.
  * @param {string} imageId
  * @returns {string|null}
@@ -15,8 +15,10 @@ function extractPlateFromImage(imageId) {
   }
   try {
     LAST_OCR_STATUS = 'idle';
-    if (!LINE_ACCESS_TOKEN || !GEMINI_API_KEY) {
-      pushOcrDebugStep(steps, 'config', 'missing token or api key');
+    const provider = getOcrProvider();
+    pushOcrDebugStep(steps, 'provider', provider);
+    if (!LINE_ACCESS_TOKEN || !isOcrProviderConfigured(provider)) {
+      pushOcrDebugStep(steps, 'config', 'missing token or provider config');
       flushOcrDebugSummary(steps);
       return null;
     }
@@ -153,6 +155,26 @@ function fetchLineImageBlob(imageId, steps) {
 }
 
 function requestPlateOcr(imageBlob, promptText, maxOutputTokens, steps) {
+  const provider = getOcrProvider();
+  if (provider === 'vision') {
+    return requestPlateOcrWithVision(imageBlob, promptText, steps);
+  }
+  return requestPlateOcrWithGemini(imageBlob, promptText, maxOutputTokens, steps);
+}
+
+function getOcrProvider() {
+  const provider = ((typeof OCR_PROVIDER !== 'undefined' && OCR_PROVIDER) || 'gemini').toLowerCase();
+  return provider === 'vision' ? 'vision' : 'gemini';
+}
+
+function isOcrProviderConfigured(provider) {
+  if (provider === 'vision') {
+    return !!VISION_API_KEY;
+  }
+  return !!GEMINI_API_KEY;
+}
+
+function requestPlateOcrWithGemini(imageBlob, promptText, maxOutputTokens, steps) {
   const response = fetchWithRetry(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY,
     {
@@ -212,6 +234,54 @@ function requestPlateOcr(imageBlob, promptText, maxOutputTokens, steps) {
   return text;
 }
 
+function requestPlateOcrWithVision(imageBlob, promptText, steps) {
+  const response = fetchWithRetry(
+    'https://vision.googleapis.com/v1/images:annotate?key=' + VISION_API_KEY,
+    {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        requests: [{
+          image: {
+            content: Utilities.base64Encode(imageBlob.getBytes())
+          },
+          features: [{
+            type: 'TEXT_DETECTION',
+            maxResults: 5
+          }]
+        }]
+      })
+    },
+    {
+      serviceName: 'Vision OCR API',
+      operation: 'ocr plate image'
+    }
+  );
+
+  if (response.getResponseCode() === 429) {
+    LAST_OCR_STATUS = 'vision_rate_limit';
+    console.error('Vision OCR API Rate Limit: ' + response.getContentText());
+    pushOcrDebugStep(steps, 'vision', 'status=429 rate_limit');
+    return null;
+  }
+
+  pushOcrDebugStep(steps, 'vision', 'status=' + response.getResponseCode());
+  const json = JSON.parse(response.getContentText());
+  if (json.error) {
+    LAST_OCR_STATUS = classifyVisionError(json.error);
+    console.error('Vision OCR API Error: ' + JSON.stringify(json.error));
+    pushOcrDebugStep(steps, 'vision_error', truncateDebugText(JSON.stringify(json.error), 160));
+    return null;
+  }
+
+  const annotation = json.responses &&
+    json.responses[0] &&
+    (json.responses[0].fullTextAnnotation || json.responses[0].textAnnotations && json.responses[0].textAnnotations[0]);
+  const text = annotation && annotation.text ? annotation.text.trim() : annotation && annotation.description ? annotation.description.trim() : null;
+  pushOcrDebugStep(steps, 'vision_text', safeDebugValue(text));
+  return text;
+}
+
 function buildOcrPrompt() {
   return 'อ่านเลขทะเบียนรถจากภาพนี้\n' +
     'ตอบเฉพาะเลขทะเบียนที่เห็น โดยไม่ต้องใส่ช่องว่าง\n' +
@@ -230,6 +300,18 @@ function classifyGeminiError(error) {
   }
 
   return 'gemini_error';
+}
+
+function classifyVisionError(error) {
+  const code = error && error.code;
+  const status = error && error.status;
+  const message = error && error.message ? error.message.toLowerCase() : '';
+
+  if (code === 429 || status === 'RESOURCE_EXHAUSTED' || message.indexOf('quota') !== -1 || message.indexOf('rate') !== -1) {
+    return 'vision_rate_limit';
+  }
+
+  return 'vision_error';
 }
 
 function cleanPlateText(rawText) {
