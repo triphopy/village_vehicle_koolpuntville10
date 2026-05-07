@@ -28,6 +28,7 @@ const sandbox = loadGasFiles([
   OCR_PROVIDER: 'gemini',
   GEMINI_API_KEY: 'gemini-test-key',
   VISION_API_KEY: 'vision-test-key',
+  LAST_OCR_STATUS: 'idle',
   CacheService: {
     getScriptCache: () => cacheStub
   },
@@ -106,10 +107,14 @@ test('requestPlateOcr routes to the selected provider', () => {
   };
 
   sandbox.OCR_PROVIDER = 'vision';
-  sandbox.fetchWithRetry = () => ({
+  sandbox.fetchWithRetry = (_url, options) => ({
     getResponseCode: () => 200,
     getContentText: () => JSON.stringify({
-      responses: [{ fullTextAnnotation: { text: '2กว6' } }]
+      responses: [{
+        fullTextAnnotation: {
+          text: JSON.parse(options.payload).requests[0].features[0].type === 'TEXT_DETECTION' ? '2กว6' : ''
+        }
+      }]
     })
   });
   assert.equal(sandbox.requestPlateOcr(imageBlob, 'prompt', undefined, []), '2กว6');
@@ -121,6 +126,64 @@ test('requestPlateOcr routes to the selected provider', () => {
       candidates: [{ content: { parts: [{ text: 'ทด1234' }] } }]
     })
   });
+  assert.equal(sandbox.requestPlateOcr(imageBlob, 'prompt', undefined, []), 'ทด1234');
+});
+
+test('vision provider falls back to document text detection and gemini when needed', () => {
+  const imageBlob = {
+    getBytes: () => [1, 2, 3],
+    getContentType: () => 'image/jpeg'
+  };
+
+  sandbox.OCR_PROVIDER = 'vision';
+
+  const calls = [];
+  sandbox.fetchWithRetry = (url, options) => {
+    calls.push({ url, payload: options && options.payload ? JSON.parse(options.payload) : null });
+    if (url.indexOf('vision.googleapis.com') !== -1) {
+      const featureType = calls[calls.length - 1].payload.requests[0].features[0].type;
+      if (featureType === 'TEXT_DETECTION') {
+        return {
+          getResponseCode: () => 200,
+          getContentText: () => JSON.stringify({ responses: [{}] })
+        };
+      }
+      return {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({
+          responses: [{ fullTextAnnotation: { text: 'งฉ1373' } }]
+        })
+      };
+    }
+
+    return {
+      getResponseCode: () => 200,
+      getContentText: () => JSON.stringify({
+        candidates: [{ content: { parts: [{ text: 'fallback' }] } }]
+      })
+    };
+  };
+
+  assert.equal(sandbox.requestPlateOcr(imageBlob, 'prompt', undefined, []), 'งฉ1373');
+  assert.equal(calls[0].url.includes('vision.googleapis.com'), true);
+  assert.equal(calls[0].payload.requests[0].features[0].type, 'TEXT_DETECTION');
+  assert.equal(calls[1].payload.requests[0].features[0].type, 'DOCUMENT_TEXT_DETECTION');
+
+  sandbox.fetchWithRetry = (url, options) => {
+    if (url.indexOf('vision.googleapis.com') !== -1) {
+      return {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ responses: [{}] })
+      };
+    }
+    return {
+      getResponseCode: () => 200,
+      getContentText: () => JSON.stringify({
+        candidates: [{ content: { parts: [{ text: 'ทด1234' }] } }]
+      })
+    };
+  };
+
   assert.equal(sandbox.requestPlateOcr(imageBlob, 'prompt', undefined, []), 'ทด1234');
 });
 

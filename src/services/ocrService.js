@@ -157,7 +157,7 @@ function fetchLineImageBlob(imageId, steps) {
 function requestPlateOcr(imageBlob, promptText, maxOutputTokens, steps) {
   const provider = getOcrProvider();
   if (provider === 'vision') {
-    return requestPlateOcrWithVision(imageBlob, promptText, steps);
+    return requestPlateOcrWithVision(imageBlob, promptText, maxOutputTokens, steps);
   }
   return requestPlateOcrWithGemini(imageBlob, promptText, maxOutputTokens, steps);
 }
@@ -234,7 +234,45 @@ function requestPlateOcrWithGemini(imageBlob, promptText, maxOutputTokens, steps
   return text;
 }
 
-function requestPlateOcrWithVision(imageBlob, promptText, steps) {
+function requestPlateOcrWithVision(imageBlob, promptText, maxOutputTokens, steps) {
+  const textDetectionText = requestPlateOcrWithVisionFeature(imageBlob, 'TEXT_DETECTION', steps);
+  if (textDetectionText) {
+    pushOcrDebugStep(steps, 'vision_path', 'text_detection');
+    return textDetectionText;
+  }
+
+  if (LAST_OCR_STATUS === 'vision_rate_limit' || LAST_OCR_STATUS === 'vision_error') {
+    pushOcrDebugStep(steps, 'vision_path', 'text_detection_failed_hard');
+  } else {
+    pushOcrDebugStep(steps, 'vision_path', 'text_detection_empty_try_document');
+  }
+
+  const documentDetectionText = requestPlateOcrWithVisionFeature(imageBlob, 'DOCUMENT_TEXT_DETECTION', steps);
+  if (documentDetectionText) {
+    pushOcrDebugStep(steps, 'vision_path', 'document_text_detection');
+    return documentDetectionText;
+  }
+
+  if (LAST_OCR_STATUS === 'vision_rate_limit' || LAST_OCR_STATUS === 'vision_error') {
+    pushOcrDebugStep(steps, 'vision_path', 'document_detection_failed_hard');
+  } else {
+    pushOcrDebugStep(steps, 'vision_path', 'document_detection_empty_try_gemini');
+  }
+
+  if (GEMINI_API_KEY) {
+    const geminiFallbackText = requestPlateOcrWithGemini(imageBlob, promptText, maxOutputTokens, steps);
+    if (geminiFallbackText) {
+      pushOcrDebugStep(steps, 'fallback', 'gemini');
+      return geminiFallbackText;
+    }
+  } else {
+    pushOcrDebugStep(steps, 'fallback', 'gemini_unavailable');
+  }
+
+  return null;
+}
+
+function requestPlateOcrWithVisionFeature(imageBlob, featureType, steps) {
   const response = fetchWithRetry(
     'https://vision.googleapis.com/v1/images:annotate?key=' + VISION_API_KEY,
     {
@@ -246,7 +284,7 @@ function requestPlateOcrWithVision(imageBlob, promptText, steps) {
             content: Utilities.base64Encode(imageBlob.getBytes())
           },
           features: [{
-            type: 'TEXT_DETECTION',
+            type: featureType,
             maxResults: 5
           }]
         }]
@@ -254,32 +292,39 @@ function requestPlateOcrWithVision(imageBlob, promptText, steps) {
     },
     {
       serviceName: 'Vision OCR API',
-      operation: 'ocr plate image'
+      operation: 'ocr plate image ' + featureType
     }
   );
 
   if (response.getResponseCode() === 429) {
     LAST_OCR_STATUS = 'vision_rate_limit';
     console.error('Vision OCR API Rate Limit: ' + response.getContentText());
-    pushOcrDebugStep(steps, 'vision', 'status=429 rate_limit');
+    pushOcrDebugStep(steps, 'vision_' + featureType.toLowerCase(), 'status=429 rate_limit');
     return null;
   }
 
-  pushOcrDebugStep(steps, 'vision', 'status=' + response.getResponseCode());
+  pushOcrDebugStep(steps, 'vision_' + featureType.toLowerCase(), 'status=' + response.getResponseCode());
   const json = JSON.parse(response.getContentText());
   if (json.error) {
     LAST_OCR_STATUS = classifyVisionError(json.error);
     console.error('Vision OCR API Error: ' + JSON.stringify(json.error));
-    pushOcrDebugStep(steps, 'vision_error', truncateDebugText(JSON.stringify(json.error), 160));
+    pushOcrDebugStep(steps, 'vision_' + featureType.toLowerCase() + '_error', truncateDebugText(JSON.stringify(json.error), 160));
     return null;
   }
 
-  const annotation = json.responses &&
+  const annotation = getVisionAnnotation(json);
+  const text = annotation && annotation.text ? annotation.text.trim() : annotation && annotation.description ? annotation.description.trim() : null;
+  if (!text && LAST_OCR_STATUS === 'idle') {
+    LAST_OCR_STATUS = 'no_text';
+  }
+  pushOcrDebugStep(steps, 'vision_' + featureType.toLowerCase() + '_text', safeDebugValue(text));
+  return text;
+}
+
+function getVisionAnnotation(json) {
+  return json.responses &&
     json.responses[0] &&
     (json.responses[0].fullTextAnnotation || json.responses[0].textAnnotations && json.responses[0].textAnnotations[0]);
-  const text = annotation && annotation.text ? annotation.text.trim() : annotation && annotation.description ? annotation.description.trim() : null;
-  pushOcrDebugStep(steps, 'vision_text', safeDebugValue(text));
-  return text;
 }
 
 function buildOcrPrompt() {
